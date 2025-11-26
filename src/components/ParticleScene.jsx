@@ -29,7 +29,9 @@ function ParticleScene({ interactionStrength, handRotation, handDistance }) {
     shape: 'Heart',
     autoRotate: false,  // 改为false，使用手势控制
     rotationSensitivity: 0.01,
-    distanceSensitivity: 5.0
+    distanceSensitivity: 3.0,  // 降低灵敏度（原5.0）
+    minDistance: 6,     // 最近距离
+    maxDistance: 12     // 最远距离（确保模型可见）
   })
 
   // 初始化Three.js场景
@@ -101,10 +103,12 @@ function ParticleScene({ interactionStrength, handRotation, handDistance }) {
       material.color.set(value)
     })
     
-    // {{ AURA-X: Modify - 添加手势控制灵敏度调节 }}
+    // {{ AURA-X: Modify - 添加手势控制灵敏度和距离范围调节 }}
     const gestureFolder = gui.addFolder('🖐️ 手势控制')
     gestureFolder.add(config, 'rotationSensitivity', 0.001, 0.05).name('旋转灵敏度')
-    gestureFolder.add(config, 'distanceSensitivity', 1, 10).name('距离灵敏度')
+    gestureFolder.add(config, 'distanceSensitivity', 1, 5).name('距离灵敏度')
+    gestureFolder.add(config, 'minDistance', 4, 8).name('最近距离')
+    gestureFolder.add(config, 'maxDistance', 8, 15).name('最远距离')
     gestureFolder.add(config, 'autoRotate').name('自动旋转').onChange(value => {
       controls.autoRotate = value
     })
@@ -187,8 +191,9 @@ function ParticleScene({ interactionStrength, handRotation, handDistance }) {
         }
       }
       
-      // {{ AURA-X: Add - 根据手掌距离控制相机远近 }}
-      const targetZ = 5 + currentDistance * config.distanceSensitivity  // 5-15之间
+      // {{ AURA-X: Modify - 根据手掌距离控制相机远近，限制范围确保可见 }}
+      const rawTargetZ = config.minDistance + currentDistance * config.distanceSensitivity
+      const targetZ = Math.max(config.minDistance, Math.min(config.maxDistance, rawTargetZ))
       camera.position.z += (targetZ - camera.position.z) * 0.1
       
       // 材质透明度随强度变化

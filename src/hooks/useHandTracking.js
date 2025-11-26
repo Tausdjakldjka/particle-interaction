@@ -1,3 +1,10 @@
+/*
+ * @Author: guoyawei
+ * @LastEditors: guoyawei
+ * @Email: guoyawei@supcon.com
+ * @Date: 2025-11-26 13:27:32
+ * @LastEditTime: 2025-11-26 15:52:51
+ */
 import { useState, useRef, useEffect } from 'react'
 import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision'
 
