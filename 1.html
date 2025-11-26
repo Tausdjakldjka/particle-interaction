@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Three.js 粒子交互 (离线模型版)</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Segoe UI', sans-serif; color: white; }
+        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
+        
+        /* 摄像头预览 */
+        #video-preview {
+            position: absolute; bottom: 20px; left: 20px;
+            width: 160px; height: 120px;
+            border-radius: 8px; border: 2px solid rgba(255, 255, 255, 0.3);
+            transform: scaleX(-1); z-index: 2; opacity: 0.7; background: #222;
+        }
+
+        /* 状态/加载面板 */
+        #overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); z-index: 10;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+        }
+        
+        .panel {
+            background: #1a1a1a; padding: 30px; border-radius: 16px;
+            border: 1px solid #333; text-align: center; max-width: 500px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        h2 { margin-top: 0; color: #00ffff; }
+        p { color: #ccc; line-height: 1.6; margin-bottom: 20px; }
+        
+        /* 按钮样式 */
+        .btn {
+            display: inline-block; padding: 12px 24px; margin: 10px;
+            border-radius: 8px; text-decoration: none; font-weight: bold;
+            transition: all 0.2s; border: none; cursor: pointer;
+        }
+        .btn-download { background: #333; color: #fff; border: 1px solid #555; }
+        .btn-download:hover { background: #444; border-color: #777; }
+        
+        /* 文件输入伪装 */
+        .file-upload-wrapper {
+            position: relative; overflow: hidden; display: inline-block;
+        }
+        .file-upload-wrapper input[type=file] {
+            font-size: 100px; position: absolute; left: 0; top: 0; opacity: 0; cursor: pointer;
+        }
+        .btn-upload { background: #00ffff; color: #000; }
+        .btn-upload:hover { background: #00cccc; transform: scale(1.05); }
+
+        #fullscreen-btn {
+            position: absolute; bottom: 20px; right: 20px;
+            background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white; padding: 10px 20px; border-radius: 20px;
+            cursor: pointer; z-index: 5;
+        }
+    </style>
+    
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://esm.sh/three@0.160.0",
+                "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/",
+                "lil-gui": "https://esm.sh/lil-gui@0.19.1",
+                "@mediapipe/tasks-vision": "https://esm.sh/@mediapipe/tasks-vision@0.10.3"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="overlay">
+        <div class="panel" id="loading-panel">
+            <div class="spinner" style="font-size: 30px; margin-bottom: 20px;">🔮</div>
+            <div id="status-text">正在尝试自动连接 AI 服务器...</div>
+        </div>
+
+        <div class="panel" id="manual-panel" style="display: none;">
+            <h2>⚠️ 网络连接中断</h2>
+            <p>无法自动下载 Google 的 AI 模型文件。<br>请按照以下两步手动加载：</p>
+            
+            <div style="background: #222; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <div style="margin-bottom:10px; font-size: 14px; color: #888;">第一步：下载模型文件 (约9MB)</div>
+                <a href="https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task" target="_blank" class="btn btn-download">
+                    ⬇️ 点击下载 hand_landmarker.task
+                </a>
+                <div style="font-size: 12px; color: #666; margin-top:5px;">(如果浏览器拦截下载，请右键链接“另存为...”)</div>
+            </div>
+
+            <div style="background: #222; padding: 15px; border-radius: 8px;">
+                <div style="margin-bottom:10px; font-size: 14px; color: #888;">第二步：点击下方按钮选择刚才下载的文件</div>
+                <div class="file-upload-wrapper">
+                    <button class="btn btn-upload">📂 选择文件并启动</button>
+                    <input type="file" id="model-input" accept=".task">
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <video id="video-preview" autoplay playsinline muted></video>
+    <div id="canvas-container"></div>
+    <button id="fullscreen-btn">⛶ 全屏</button>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GUI } from 'lil-gui';
+        import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
+
+        // --- 全局变量 ---
+        const CONFIG = {
+            particleCount: 15000,
+            particleSize: 0.05,
+            color: '#00ffff',
+            shape: 'Heart',
+            interactionStrength: 0.0,
+            autoRotate: true
+        };
+        
+        let handLandmarker = null;
+        let video = document.getElementById('video-preview');
+        let visionContext = null;
+
+        // --- UI 控制逻辑 ---
+        const overlay = document.getElementById('overlay');
+        const loadingPanel = document.getElementById('loading-panel');
+        const manualPanel = document.getElementById('manual-panel');
+        const statusText = document.getElementById('status-text');
+
+        // --- 1. 尝试初始化 AI ---
+        async function initVision(modelUrl = null) {
+            try {
+                if (!visionContext) {
+                    statusText.innerText = "正在加载 WASM 运行环境...";
+                    visionContext = await FilesetResolver.forVisionTasks(
+                        "https://esm.sh/@mediapipe/tasks-vision@0.10.3/wasm"
+                    );
+                }
+
+                let finalModelPath = modelUrl;
+                
+                // 如果没有提供本地文件URL，尝试从 Google 下载
+                if (!finalModelPath) {
+                    statusText.innerText = "尝试连接 Google 模型库...";
+                    finalModelPath = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+                } else {
+                    statusText.innerText = "正在解析本地模型文件...";
+                }
+
+                handLandmarker = await HandLandmarker.createFromOptions(visionContext, {
+                    baseOptions: {
+                        modelAssetPath: finalModelPath,
+                        delegate: "GPU"
+                    },
+                    runningMode: "VIDEO",
+                    numHands: 2
+                });
+
+                // 成功了！启动摄像头
+                statusText.innerText = "模型加载成功！启动摄像头...";
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                
+                video.addEventListener("loadeddata", () => {
+                    overlay.style.display = 'none'; // 隐藏遮罩
+                    animate(); // 开始动画循环
+                });
+
+            } catch (err) {
+                console.error("AI Init Failed:", err);
+                // 如果是自动加载失败，显示手动面板
+                if (!modelUrl) {
+                    loadingPanel.style.display = 'none';
+                    manualPanel.style.display = 'block';
+                } else {
+                    alert("文件解析失败，请确保你选择的是正确的 .task 文件");
+                }
+            }
+        }
+
+        // --- 2. 监听文件选择 (手动模式) ---
+        document.getElementById('model-input').addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                // 将文件转换为浏览器内部 URL (blob:...)
+                const localUrl = URL.createObjectURL(file);
+                // 重新尝试初始化
+                loadingPanel.style.display = 'block';
+                manualPanel.style.display = 'none';
+                initVision(localUrl);
+            }
+        });
+
+        // 立即尝试自动加载
+        initVision();
+
+
+        // ==========================================
+        // 下方是 Three.js 渲染逻辑 (保持不变)
+        // ==========================================
+
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x000000, 0.02);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 8; camera.position.y = 2;
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true; controls.autoRotate = true;
+
+        // 粒子
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(CONFIG.particleCount * 3);
+        const shapes = { 'Heart': [], 'Sphere': [], 'Flower': [], 'Knot': [], 'Fireworks': [] };
+
+        function initShapes() {
+            const count = CONFIG.particleCount;
+            // 预分配数组
+            shapes.Heart = new Float32Array(count * 3);
+            shapes.Sphere = new Float32Array(count * 3);
+            shapes.Flower = new Float32Array(count * 3);
+            shapes.Knot = new Float32Array(count * 3);
+            shapes.Fireworks = new Float32Array(count * 3);
+
+            for (let i = 0; i < count; i++) {
+                // Heart
+                const t = Math.random() * Math.PI * 2, rH = Math.pow(Math.random(), 0.3);
+                let x = 16 * Math.pow(Math.sin(t), 3), y = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t), z = (Math.random() - 0.5) * 4;
+                x *= 0.15 * rH; y *= 0.15 * rH; z *= rH;
+                shapes.Heart[i*3]=x; shapes.Heart[i*3+1]=y; shapes.Heart[i*3+2]=z;
+
+                // Sphere
+                const phi = Math.acos(-1 + (2 * i) / count), theta = Math.sqrt(count * Math.PI) * phi;
+                const rS = 3;
+                shapes.Sphere[i*3]=rS*Math.cos(theta)*Math.sin(phi); shapes.Sphere[i*3+1]=rS*Math.sin(theta)*Math.sin(phi); shapes.Sphere[i*3+2]=rS*Math.cos(phi);
+
+                // Flower
+                const tF = Math.random() * Math.PI * 2, pF = Math.random() * Math.PI;
+                const rF = 2 + Math.sin(5 * tF) * Math.sin(5 * pF);
+                shapes.Flower[i*3]=rF*Math.sin(pF)*Math.cos(tF); shapes.Flower[i*3+1]=rF*Math.sin(pF)*Math.sin(tF); shapes.Flower[i*3+2]=rF*Math.cos(pF);
+
+                // Knot
+                const u = Math.random() * Math.PI * 2, v = Math.random() * Math.PI * 2;
+                const p = 3, q = 7, rK = 2 + Math.cos(q * u / p) * 0.5;
+                shapes.Knot[i*3]=(rK*Math.cos(u)*(2+Math.cos(v))); shapes.Knot[i*3+1]=(rK*Math.sin(u)*(2+Math.cos(v))); shapes.Knot[i*3+2]=(rK*Math.sin(v));
+
+                // Fireworks
+                shapes.Fireworks[i*3]=(Math.random()-0.5)*12; shapes.Fireworks[i*3+1]=(Math.random()-0.5)*12; shapes.Fireworks[i*3+2]=(Math.random()-0.5)*12;
+            }
+            positions.set(shapes.Heart);
+        }
+        initShapes();
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const material = new THREE.PointsMaterial({ color: CONFIG.color, size: CONFIG.particleSize, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false });
+        const particles = new THREE.Points(geometry, material);
+        scene.add(particles);
+
+        // GUI
+        const gui = new GUI({ title: "交互控制" });
+        gui.add(CONFIG, 'shape', Object.keys(shapes)).name('切换模型');
+        gui.addColor(CONFIG, 'color').name('颜色').onChange(v => material.color.set(v));
+        gui.add(CONFIG, 'autoRotate').name('自动旋转').onChange(v => controls.autoRotate = v);
+        gui.add(CONFIG, 'interactionStrength', 0, 1).name('张合力度').listen();
+
+        // 动画循环
+        let lastVideoTime = -1;
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // 只有当模型加载好后才运行检测
+            if (handLandmarker && video.videoWidth) {
+                if (video.currentTime !== lastVideoTime) {
+                    lastVideoTime = video.currentTime;
+                    const result = handLandmarker.detectForVideo(video, performance.now());
+                    if (result.landmarks.length > 0) {
+                        const hand = result.landmarks[0];
+                        const dist = Math.sqrt(Math.pow(hand[4].x - hand[8].x, 2) + Math.pow(hand[4].y - hand[8].y, 2));
+                        let strength = (dist - 0.03) * 5; 
+                        strength = Math.max(0, Math.min(1, strength));
+                        CONFIG.interactionStrength += (strength - CONFIG.interactionStrength) * 0.1;
+                    } else {
+                        CONFIG.interactionStrength += (0 - CONFIG.interactionStrength) * 0.05;
+                    }
+                }
+            }
+
+            controls.update();
+
+            const pos = particles.geometry.attributes.position.array;
+            const target = shapes[CONFIG.shape];
+            const scale = 1 + CONFIG.interactionStrength * 2.0;
+            const jitter = CONFIG.interactionStrength * 0.1;
+
+            for (let i = 0; i < CONFIG.particleCount; i++) {
+                const idx = i * 3;
+                let tx = target[idx] * scale + (Math.random()-0.5)*jitter;
+                let ty = target[idx+1] * scale + (Math.random()-0.5)*jitter;
+                let tz = target[idx+2] * scale + (Math.random()-0.5)*jitter;
+
+                pos[idx] += (tx - pos[idx]) * 0.06;
+                pos[idx+1] += (ty - pos[idx+1]) * 0.06;
+                pos[idx+2] += (tz - pos[idx+2]) * 0.06;
+            }
+            particles.geometry.attributes.position.needsUpdate = true;
+            if(CONFIG.interactionStrength > 0.5) particles.rotation.y += 0.02;
+
+            renderer.render(scene, camera);
+        }
+        
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        document.getElementById('fullscreen-btn').addEventListener('click', () => {
+             document.documentElement.requestFullscreen(); 
+        });
+
+    </script>
+</body>
+</html>
