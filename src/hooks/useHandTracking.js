@@ -185,28 +185,82 @@ export function useHandTracking() {
           const result = landmarker.detectForVideo(video, performance.now())
 
           if (result.landmarks.length > 0) {
-            // 计算拇指尖(4)和食指尖(8)的距离
+            // {{ AURA-X: Modify - 使用手指开合度计算，更灵敏自然 }}
             const hand = result.landmarks[0]
-            const thumbTip = hand[4]
-            const indexTip = hand[8]
             
-            const dist = Math.sqrt(
-              Math.pow(thumbTip.x - indexTip.x, 2) + 
-              Math.pow(thumbTip.y - indexTip.y, 2)
-            )
-
-            // 距离映射到0-1的强度值
-            let strength = (dist - 0.03) * 5
+            // 关键点索引
+            const wrist = hand[0]        // 手腕
+            const thumbTip = hand[4]     // 拇指尖
+            const indexTip = hand[8]     // 食指尖
+            const middleTip = hand[12]   // 中指尖
+            const ringTip = hand[16]     // 无名指尖
+            const pinkyTip = hand[20]    // 小指尖
+            
+            // 方法1: 计算所有指尖相对于手腕的平均距离（手掌张开度）
+            const fingerTips = [thumbTip, indexTip, middleTip, ringTip, pinkyTip]
+            let totalSpread = 0
+            
+            fingerTips.forEach(tip => {
+              const dist = Math.sqrt(
+                Math.pow(tip.x - wrist.x, 2) + 
+                Math.pow(tip.y - wrist.y, 2) +
+                Math.pow(tip.z - wrist.z, 2)
+              )
+              totalSpread += dist
+            })
+            
+            const avgSpread = totalSpread / 5
+            
+            // 方法2: 计算指尖之间的最大跨度（手指张开宽度）
+            let maxSpan = 0
+            for (let i = 0; i < fingerTips.length; i++) {
+              for (let j = i + 1; j < fingerTips.length; j++) {
+                const span = Math.sqrt(
+                  Math.pow(fingerTips[i].x - fingerTips[j].x, 2) + 
+                  Math.pow(fingerTips[i].y - fingerTips[j].y, 2)
+                )
+                maxSpan = Math.max(maxSpan, span)
+              }
+            }
+            
+            // 方法3: 计算手指分散度（指尖到手掌中心的方差）
+            const centerX = fingerTips.reduce((sum, tip) => sum + tip.x, 0) / 5
+            const centerY = fingerTips.reduce((sum, tip) => sum + tip.y, 0) / 5
+            
+            let dispersion = 0
+            fingerTips.forEach(tip => {
+              dispersion += Math.sqrt(
+                Math.pow(tip.x - centerX, 2) + 
+                Math.pow(tip.y - centerY, 2)
+              )
+            })
+            dispersion /= 5
+            
+            // 综合计算开合强度（加权组合）
+            // avgSpread: 0.2-0.4（握拳到张开）
+            // maxSpan: 0.1-0.3（手指最大跨度）
+            // dispersion: 0.05-0.15（手指分散度）
+            const spreadScore = (avgSpread - 0.2) / 0.2    // 归一化到0-1
+            const spanScore = (maxSpan - 0.1) / 0.2        // 归一化到0-1
+            const dispersionScore = (dispersion - 0.05) / 0.1  // 归一化到0-1
+            
+            // 加权平均（手掌张开度占主要权重）
+            let strength = spreadScore * 0.5 + spanScore * 0.3 + dispersionScore * 0.2
+            
+            // 限制在0-1范围
             strength = Math.max(0, Math.min(1, strength))
+            
+            // 增强灵敏度：应用曲线调整
+            strength = Math.pow(strength, 0.8)  // 使响应更灵敏
 
             // 平滑过渡
             setInteractionStrength(prev => {
-              const newValue = prev + (strength - prev) * 0.1
+              const newValue = prev + (strength - prev) * 0.15  // 提高响应速度
               
               // 每3秒输出一次调试信息
               const now = Date.now()
               if (now - lastDebugTime > 3000) {
-                console.log(`🖐️ 手势检测活跃 | 距离: ${dist.toFixed(3)} | 强度: ${newValue.toFixed(3)}`)
+                console.log(`🖐️ 手势检测 | 张开度: ${avgSpread.toFixed(3)} | 跨度: ${maxSpan.toFixed(3)} | 强度: ${newValue.toFixed(3)}`)
                 lastDebugTime = now
               }
               
