@@ -67,7 +67,7 @@ function ParticleScene({ interactionStrength, handRotation, handDistance, isFaci
     // 添加轨道控制器
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
-    controls.autoRotate = true
+    controls.autoRotate = false  // 关闭自动旋转
     controlsRef.current = controls
 
     // 初始化粒子形状
@@ -176,22 +176,17 @@ function ParticleScene({ interactionStrength, handRotation, handDistance, isFaci
       
       particles.geometry.attributes.position.needsUpdate = true
 
-      // {{ AURA-X: Modify - 根据手掌旋转角度控制粒子系统旋转，正面时快速复位 }}
-      if (!config.autoRotate) {
-        const sens = config.rotationSensitivity
-        // 正面时加速归零
-        const resetSpeed = isFacingCamera ? 0.3 : 0.1
-        // 将手掌的俯仰、偏航映射到粒子的旋转
-        particles.rotation.x += (currentRotation.x * sens - particles.rotation.x) * resetSpeed
-        particles.rotation.y += (currentRotation.y * sens - particles.rotation.y) * resetSpeed
-        particles.rotation.z += (currentRotation.z * sens * 0.5 - particles.rotation.z) * resetSpeed
-      } else {
-        // 自动旋转模式
-        if (currentStrength > 0.3) {
-          particles.rotation.y += 0.01 * currentStrength
-          particles.rotation.x += 0.005 * currentStrength
-        }
-      }
+      // {{ AURA-X: Modify - 只在Y轴旋转，X和Z轴保持固定 }}
+      // 只使用Y轴（左右旋转），正面时快速复位
+      const resetSpeed = isFacingCamera ? 0.3 : 0.1
+      const sens = config.rotationSensitivity
+      
+      // Y轴旋转（左右转动）
+      particles.rotation.y += (currentRotation.y * sens - particles.rotation.y) * resetSpeed
+      
+      // X轴和Z轴保持在初始位置（不旋转）
+      particles.rotation.x += (0 - particles.rotation.x) * 0.1
+      particles.rotation.z += (0 - particles.rotation.z) * 0.1
       
       // {{ AURA-X: Modify - 根据手掌距离控制相机远近，限制范围确保可见 }}
       const rawTargetZ = config.minDistance + currentDistance * config.distanceSensitivity

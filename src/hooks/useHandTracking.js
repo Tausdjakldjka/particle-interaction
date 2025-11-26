@@ -323,12 +323,11 @@ export function useHandTracking() {
             // 修正映射关系：palmWidth 0.08-0.25 → distance 1.0-0.0
             const distance = Math.max(0, Math.min(1, (0.25 - palmWidth) / (0.25 - 0.08)))
 
-            // {{ AURA-X: Modify - 正面时开合度也复位到0（初始状态）}}
-            // 平滑过渡（正面时强制为0，即初始收缩状态）
-            const finalStrength = isFacingCamera ? 0 : strength
+            // {{ AURA-X: Modify - 正面时也保持开合功能 }}
+            // 平滑过渡（正面时也响应手势开合）
             setInteractionStrength(prev => {
-              const resetSpeed = isFacingCamera ? 0.3 : 0.15
-              return prev + (finalStrength - prev) * resetSpeed
+              const newValue = prev + (strength - prev) * 0.15
+              return newValue
             })
             
             // 平滑过渡旋转角度（正面时快速复位）
