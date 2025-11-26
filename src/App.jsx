@@ -103,6 +103,7 @@ function App() {
         interactionStrength={interactionStrength}
         handRotation={handRotation}
         handDistance={handDistance}
+        isFacingCamera={isFacingCamera}
       />
       <FullscreenButton />
     </div>

@@ -305,7 +305,7 @@ export function useHandTracking() {
             
             // 检测手掌背面是否朝向摄像头（法向量Z分量接近+1，即手掌心朝向自己）
             // 这样的姿态是"标准正面"，用于复位模型
-            const isFacingCamera = normal.z > 0.7  // 手掌背面朝摄像头
+            const isFacingCamera = normal.z > 0.65  // 手掌背面朝摄像头（降低阈值更容易触发）
             
             // 如果手掌正面，将旋转角度归零（复位）
             const finalRotationX = isFacingCamera ? 0 : rotationX
@@ -323,10 +323,12 @@ export function useHandTracking() {
             // 修正映射关系：palmWidth 0.08-0.25 → distance 1.0-0.0
             const distance = Math.max(0, Math.min(1, (0.25 - palmWidth) / (0.25 - 0.08)))
 
-            // 平滑过渡
+            // {{ AURA-X: Modify - 正面时开合度也复位到0（初始状态）}}
+            // 平滑过渡（正面时强制为0，即初始收缩状态）
+            const finalStrength = isFacingCamera ? 0 : strength
             setInteractionStrength(prev => {
-              const newValue = prev + (strength - prev) * 0.15
-              return newValue
+              const resetSpeed = isFacingCamera ? 0.3 : 0.15
+              return prev + (finalStrength - prev) * resetSpeed
             })
             
             // 平滑过渡旋转角度（正面时快速复位）

@@ -9,7 +9,7 @@ import './ParticleScene.css'
  * Three.js粒子场景组件
  * {{ AURA-X: Create - 将Three.js渲染逻辑封装为React组件 }}
  */
-function ParticleScene({ interactionStrength, handRotation, handDistance }) {
+function ParticleScene({ interactionStrength, handRotation, handDistance, isFacingCamera }) {
   const containerRef = useRef(null)
   const sceneRef = useRef(null)
   const rendererRef = useRef(null)
@@ -25,7 +25,7 @@ function ParticleScene({ interactionStrength, handRotation, handDistance }) {
   const configRef = useRef({
     particleCount: 30000,  // 提升到30000（原15000，增加100%）
     particleSize: 0.04,    // 稍微减小粒子大小以保持视觉平衡
-    color: '#00ffff',
+    color: '#ff0066',      // 改为红色（浪漫的玫瑰红）
     shape: 'Heart',
     autoRotate: false,  // 改为false，使用手势控制
     rotationSensitivity: 0.01,
@@ -176,13 +176,15 @@ function ParticleScene({ interactionStrength, handRotation, handDistance }) {
       
       particles.geometry.attributes.position.needsUpdate = true
 
-      // {{ AURA-X: Add - 根据手掌旋转角度控制粒子系统旋转 }}
+      // {{ AURA-X: Modify - 根据手掌旋转角度控制粒子系统旋转，正面时快速复位 }}
       if (!config.autoRotate) {
         const sens = config.rotationSensitivity
+        // 正面时加速归零
+        const resetSpeed = isFacingCamera ? 0.3 : 0.1
         // 将手掌的俯仰、偏航映射到粒子的旋转
-        particles.rotation.x += (currentRotation.x * sens - particles.rotation.x) * 0.1
-        particles.rotation.y += (currentRotation.y * sens - particles.rotation.y) * 0.1
-        particles.rotation.z += (currentRotation.z * sens * 0.5 - particles.rotation.z) * 0.1
+        particles.rotation.x += (currentRotation.x * sens - particles.rotation.x) * resetSpeed
+        particles.rotation.y += (currentRotation.y * sens - particles.rotation.y) * resetSpeed
+        particles.rotation.z += (currentRotation.z * sens * 0.5 - particles.rotation.z) * resetSpeed
       } else {
         // 自动旋转模式
         if (currentStrength > 0.3) {
