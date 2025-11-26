@@ -7,6 +7,9 @@ import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision'
  */
 export function useHandTracking() {
   const [interactionStrength, setInteractionStrength] = useState(0)
+  // {{ AURA-X: Add - 增加手掌旋转角度和距离状态 }}
+  const [handRotation, setHandRotation] = useState({ x: 0, y: 0, z: 0 })
+  const [handDistance, setHandDistance] = useState(0)
   const videoRef = useRef(null)
   const handLandmarkerRef = useRef(null)
   const visionContextRef = useRef(null)
@@ -253,32 +256,91 @@ export function useHandTracking() {
             // 增强灵敏度：应用曲线调整
             strength = Math.pow(strength, 0.8)  // 使响应更灵敏
 
+            // {{ AURA-X: Add - 计算手掌旋转角度（基于手掌平面法向量）}}
+            // 使用手腕、食指根部、小指根部构建手掌平面
+            const indexBase = hand[5]   // 食指根部
+            const pinkyBase = hand[17]  // 小指根部
+            const middleBase = hand[9]  // 中指根部（辅助点）
+            
+            // 计算手掌的两个方向向量
+            const v1 = {
+              x: indexBase.x - wrist.x,
+              y: indexBase.y - wrist.y,
+              z: indexBase.z - wrist.z
+            }
+            const v2 = {
+              x: pinkyBase.x - wrist.x,
+              y: pinkyBase.y - wrist.y,
+              z: pinkyBase.z - wrist.z
+            }
+            
+            // 叉积得到手掌法向量
+            const normal = {
+              x: v1.y * v2.z - v1.z * v2.y,
+              y: v1.z * v2.x - v1.x * v2.z,
+              z: v1.x * v2.y - v1.y * v2.x
+            }
+            
+            // 归一化法向量
+            const normalLength = Math.sqrt(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z)
+            if (normalLength > 0) {
+              normal.x /= normalLength
+              normal.y /= normalLength
+              normal.z /= normalLength
+            }
+            
+            // 计算欧拉角（相对于初始姿态）
+            const rotationX = Math.atan2(normal.y, normal.z) * (180 / Math.PI)  // 俯仰（pitch）
+            const rotationY = Math.atan2(-normal.x, Math.sqrt(normal.y * normal.y + normal.z * normal.z)) * (180 / Math.PI)  // 偏航（yaw）
+            const rotationZ = Math.atan2(v1.y, v1.x) * (180 / Math.PI)  // 翻滚（roll）
+            
+            // {{ AURA-X: Add - 计算手掌距离（基于手掌大小）}}
+            // 使用手掌宽度（食指根到小指根）作为深度指标
+            const palmWidth = Math.sqrt(
+              Math.pow(indexBase.x - pinkyBase.x, 2) + 
+              Math.pow(indexBase.y - pinkyBase.y, 2)
+            )
+            
+            // 手掌越大 = 离摄像头越近，距离值 0-1（0=近，1=远）
+            const distance = Math.max(0, Math.min(1, 1 - (palmWidth - 0.1) / 0.15))
+
             // 平滑过渡
             setInteractionStrength(prev => {
-              const newValue = prev + (strength - prev) * 0.15  // 提高响应速度
-              
-              // 每3秒输出一次调试信息
-              const now = Date.now()
-              if (now - lastDebugTime > 3000) {
-                console.log(`🖐️ 手势检测 | 张开度: ${avgSpread.toFixed(3)} | 跨度: ${maxSpan.toFixed(3)} | 强度: ${newValue.toFixed(3)}`)
-                lastDebugTime = now
-              }
-              
+              const newValue = prev + (strength - prev) * 0.15
               return newValue
             })
+            
+            // 平滑过渡旋转角度
+            setHandRotation(prev => ({
+              x: prev.x + (rotationX - prev.x) * 0.2,
+              y: prev.y + (rotationY - prev.y) * 0.2,
+              z: prev.z + (rotationZ - prev.z) * 0.2
+            }))
+            
+            // 平滑过渡距离
+            setHandDistance(prev => prev + (distance - prev) * 0.15)
+            
+            // 每3秒输出一次调试信息
+            const now = Date.now()
+            if (now - lastDebugTime > 3000) {
+              console.log(`🖐️ 手势 | 强度: ${strength.toFixed(2)} | 旋转: (${rotationX.toFixed(0)}°, ${rotationY.toFixed(0)}°, ${rotationZ.toFixed(0)}°) | 距离: ${distance.toFixed(2)}`)
+              lastDebugTime = now
+            }
           } else {
             // 没有检测到手势，逐渐归零
-            setInteractionStrength(prev => {
-              const newValue = prev + (0 - prev) * 0.05
-              
-              // 每5秒提示一次未检测到手势
-              frameCount++
-              if (frameCount % 300 === 0) {
-                console.log('👋 未检测到手势，请将手放在摄像头前')
-              }
-              
-              return newValue
-            })
+            setInteractionStrength(prev => prev + (0 - prev) * 0.05)
+            setHandRotation(prev => ({
+              x: prev.x * 0.95,
+              y: prev.y * 0.95,
+              z: prev.z * 0.95
+            }))
+            setHandDistance(prev => prev + (0.5 - prev) * 0.05)  // 回到中间位置
+            
+            // 每5秒提示一次未检测到手势
+            frameCount++
+            if (frameCount % 300 === 0) {
+              console.log('👋 未检测到手势，请将手放在摄像头前')
+            }
           }
         }
       }
@@ -306,6 +368,8 @@ export function useHandTracking() {
   return {
     videoRef,
     interactionStrength,
+    handRotation,
+    handDistance,
     initHandTracking
   }
 }

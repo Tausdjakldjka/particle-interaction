@@ -9,7 +9,7 @@ import './ParticleScene.css'
  * Three.js粒子场景组件
  * {{ AURA-X: Create - 将Three.js渲染逻辑封装为React组件 }}
  */
-function ParticleScene({ interactionStrength }) {
+function ParticleScene({ interactionStrength, handRotation, handDistance }) {
   const containerRef = useRef(null)
   const sceneRef = useRef(null)
   const rendererRef = useRef(null)
@@ -18,14 +18,18 @@ function ParticleScene({ interactionStrength }) {
   const particlesRef = useRef(null)
   const shapesRef = useRef(null)
   const guiRef = useRef(null)
-  // {{ AURA-X: Add - 使用 ref 存储最新的 interactionStrength，避免闭包问题 }}
+  // {{ AURA-X: Add - 使用 ref 存储最新的手势数据，避免闭包问题 }}
   const interactionStrengthRef = useRef(0)
+  const handRotationRef = useRef({ x: 0, y: 0, z: 0 })
+  const handDistanceRef = useRef(0.5)
   const configRef = useRef({
     particleCount: 15000,
     particleSize: 0.05,
     color: '#00ffff',
     shape: 'Heart',
-    autoRotate: true
+    autoRotate: false,  // 改为false，使用手势控制
+    rotationSensitivity: 0.01,
+    distanceSensitivity: 5.0
   })
 
   // 初始化Three.js场景
@@ -96,22 +100,33 @@ function ParticleScene({ interactionStrength }) {
     gui.addColor(config, 'color').name('🎨 颜色').onChange(value => {
       material.color.set(value)
     })
-    gui.add(config, 'autoRotate').name('🔄 自动旋转').onChange(value => {
+    
+    // {{ AURA-X: Modify - 添加手势控制灵敏度调节 }}
+    const gestureFolder = gui.addFolder('🖐️ 手势控制')
+    gestureFolder.add(config, 'rotationSensitivity', 0.001, 0.05).name('旋转灵敏度')
+    gestureFolder.add(config, 'distanceSensitivity', 1, 10).name('距离灵敏度')
+    gestureFolder.add(config, 'autoRotate').name('自动旋转').onChange(value => {
       controls.autoRotate = value
     })
     
-    // 添加手势强度显示（只读）
-    const strengthDisplay = { interactionStrength: 0 }
-    gui.add(strengthDisplay, 'interactionStrength', 0, 1)
-      .name('🖐️ 手势强度')
-      .listen()
-      .disable()
+    // 添加手势数据显示（只读）
+    const gestureData = { 
+      strength: 0, 
+      rotationX: 0,
+      rotationY: 0,
+      distance: 0
+    }
+    gestureFolder.add(gestureData, 'strength', 0, 1).name('✋ 开合度').listen().disable()
+    gestureFolder.add(gestureData, 'rotationX', -180, 180).name('🔄 俯仰角').listen().disable()
+    gestureFolder.add(gestureData, 'rotationY', -180, 180).name('🔄 偏航角').listen().disable()
+    gestureFolder.add(gestureData, 'distance', 0, 1).name('📏 距离').listen().disable()
+    gestureFolder.close()
     
     // 添加使用说明
     const instructions = gui.addFolder('📖 使用说明')
-    instructions.add({ tip: '张开手掌 → 粒子扩散' }, 'tip').name('💡')
-    instructions.add({ tip: '握紧拳头 → 粒子收缩' }, 'tip').name('💡')
-    instructions.add({ tip: '越用力越明显' }, 'tip').name('💡')
+    instructions.add({ tip: '张开/握紧 → 粒子扩散/收缩' }, 'tip').name('💡')
+    instructions.add({ tip: '翻转手掌 → 模型旋转' }, 'tip').name('💡')
+    instructions.add({ tip: '手掌远近 → 相机远近' }, 'tip').name('💡')
     instructions.close()
 
     // 动画循环
@@ -121,14 +136,16 @@ function ParticleScene({ interactionStrength }) {
 
       controls.update()
 
-      // {{ AURA-X: Modify - 增强粒子对手势的灵动响应 }}
+      // {{ AURA-X: Modify - 增强手势控制：开合度、旋转、距离 }}
       // 更新粒子位置
       const pos = particles.geometry.attributes.position.array
       const target = shapesRef.current[config.shape]
       const currentStrength = interactionStrengthRef.current
+      const currentRotation = handRotationRef.current
+      const currentDistance = handDistanceRef.current
       
       // 动态缩放：手张开时粒子扩散，握拳时粒子收缩
-      const scale = 1 + currentStrength * 3.0  // 增大缩放范围
+      const scale = 1 + currentStrength * 3.0
       
       // 动态抖动：根据强度添加粒子抖动效果
       const jitter = currentStrength * 0.15
@@ -155,11 +172,24 @@ function ParticleScene({ interactionStrength }) {
       
       particles.geometry.attributes.position.needsUpdate = true
 
-      // 根据强度动态旋转粒子
-      if (currentStrength > 0.3) {
-        particles.rotation.y += 0.01 * currentStrength
-        particles.rotation.x += 0.005 * currentStrength
+      // {{ AURA-X: Add - 根据手掌旋转角度控制粒子系统旋转 }}
+      if (!config.autoRotate) {
+        const sens = config.rotationSensitivity
+        // 将手掌的俯仰、偏航映射到粒子的旋转
+        particles.rotation.x += (currentRotation.x * sens - particles.rotation.x) * 0.1
+        particles.rotation.y += (currentRotation.y * sens - particles.rotation.y) * 0.1
+        particles.rotation.z += (currentRotation.z * sens * 0.5 - particles.rotation.z) * 0.1
+      } else {
+        // 自动旋转模式
+        if (currentStrength > 0.3) {
+          particles.rotation.y += 0.01 * currentStrength
+          particles.rotation.x += 0.005 * currentStrength
+        }
       }
+      
+      // {{ AURA-X: Add - 根据手掌距离控制相机远近 }}
+      const targetZ = 5 + currentDistance * config.distanceSensitivity  // 5-15之间
+      camera.position.z += (targetZ - camera.position.z) * 0.1
       
       // 材质透明度随强度变化
       if (particles.material) {
@@ -194,23 +224,32 @@ function ParticleScene({ interactionStrength }) {
     }
   }, [])
 
-  // {{ AURA-X: Modify - 同步更新 ref 和 GUI 显示 }}
-  // 更新GUI中的交互强度显示
+  // {{ AURA-X: Modify - 同步更新所有手势数据到 ref 和 GUI }}
   useEffect(() => {
     // 更新 ref 为最新值
     interactionStrengthRef.current = interactionStrength
+    handRotationRef.current = handRotation || { x: 0, y: 0, z: 0 }
+    handDistanceRef.current = handDistance || 0.5
     
     if (guiRef.current) {
-      // 查找手势强度控制器并更新显示
-      const controller = guiRef.current.controllers.find(c => 
-        c.property === 'interactionStrength' && c._name === '🖐️ 手势强度'
-      )
-      if (controller) {
-        controller.object.interactionStrength = interactionStrength
-        controller.updateDisplay()
-      }
+      // 更新所有手势数据的显示
+      guiRef.current.controllers.forEach(controller => {
+        if (controller.property === 'strength') {
+          controller.object.strength = interactionStrength
+          controller.updateDisplay()
+        } else if (controller.property === 'rotationX') {
+          controller.object.rotationX = handRotation?.x || 0
+          controller.updateDisplay()
+        } else if (controller.property === 'rotationY') {
+          controller.object.rotationY = handRotation?.y || 0
+          controller.updateDisplay()
+        } else if (controller.property === 'distance') {
+          controller.object.distance = handDistance || 0.5
+          controller.updateDisplay()
+        }
+      })
     }
-  }, [interactionStrength])
+  }, [interactionStrength, handRotation, handDistance])
 
   return <div ref={containerRef} className="particle-scene" />
 }
