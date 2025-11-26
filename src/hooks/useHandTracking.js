@@ -297,22 +297,22 @@ export function useHandTracking() {
               normal.z /= normalLength
             }
             
-            // {{ AURA-X: Modify - 添加手掌正面检测，Z轴法向量接近-1时为正面 }}
+            // {{ AURA-X: Modify - 修正正反面检测，手掌背面朝向摄像头时为正面（复位） }}
             // 计算欧拉角（相对于初始姿态）
             const rotationX = Math.atan2(normal.y, normal.z) * (180 / Math.PI)  // 俯仰（pitch）
             const rotationY = Math.atan2(-normal.x, Math.sqrt(normal.y * normal.y + normal.z * normal.z)) * (180 / Math.PI)  // 偏航（yaw）
             const rotationZ = Math.atan2(v1.y, v1.x) * (180 / Math.PI)  // 翻滚（roll）
             
-            // 检测手掌是否正对摄像头（法向量Z分量接近-1）
-            // 阈值：0.8 表示手掌与摄像头夹角小于约36度
-            const isFacingCamera = normal.z < -0.8
+            // 检测手掌背面是否朝向摄像头（法向量Z分量接近+1，即手掌心朝向自己）
+            // 这样的姿态是"标准正面"，用于复位模型
+            const isFacingCamera = normal.z > 0.7  // 手掌背面朝摄像头
             
             // 如果手掌正面，将旋转角度归零（复位）
             const finalRotationX = isFacingCamera ? 0 : rotationX
             const finalRotationY = isFacingCamera ? 0 : rotationY
             const finalRotationZ = isFacingCamera ? 0 : rotationZ
             
-            // {{ AURA-X: Add - 计算手掌距离（基于手掌大小）}}
+            // {{ AURA-X: Modify - 修正距离计算，手掌越大=越近，距离值越小 }}
             // 使用手掌宽度（食指根到小指根）作为深度指标
             const palmWidth = Math.sqrt(
               Math.pow(indexBase.x - pinkyBase.x, 2) + 
@@ -320,7 +320,8 @@ export function useHandTracking() {
             )
             
             // 手掌越大 = 离摄像头越近，距离值 0-1（0=近，1=远）
-            const distance = Math.max(0, Math.min(1, 1 - (palmWidth - 0.1) / 0.15))
+            // 修正映射关系：palmWidth 0.08-0.25 → distance 1.0-0.0
+            const distance = Math.max(0, Math.min(1, (0.25 - palmWidth) / (0.25 - 0.08)))
 
             // 平滑过渡
             setInteractionStrength(prev => {
@@ -336,8 +337,13 @@ export function useHandTracking() {
               z: prev.z + (finalRotationZ - prev.z) * resetSpeed
             }))
             
-            // 平滑过渡距离
-            setHandDistance(prev => prev + (distance - prev) * 0.15)
+            // {{ AURA-X: Modify - 正面时距离也复位到中间位置 }}
+            // 平滑过渡距离（正面时强制为0.5，即中间位置）
+            const finalDistance = isFacingCamera ? 0.5 : distance
+            setHandDistance(prev => {
+              const resetSpeed = isFacingCamera ? 0.3 : 0.15
+              return prev + (finalDistance - prev) * resetSpeed
+            })
             
             // 更新正面状态
             setIsFacingCamera(isFacingCamera)
@@ -350,14 +356,19 @@ export function useHandTracking() {
               lastDebugTime = now
             }
           } else {
-            // 没有检测到手势，逐渐归零
+            // {{ AURA-X: Modify - 没有检测到手势时，保持当前状态不动 }}
+            // 强度逐渐归零
             setInteractionStrength(prev => prev + (0 - prev) * 0.05)
-            setHandRotation(prev => ({
-              x: prev.x * 0.95,
-              y: prev.y * 0.95,
-              z: prev.z * 0.95
-            }))
-            setHandDistance(prev => prev + (0.5 - prev) * 0.05)  // 回到中间位置
+            
+            // 旋转和距离保持当前位置，不要移动
+            // （注释掉自动归零，避免检测不到手时模型乱动）
+            // setHandRotation(prev => ({
+            //   x: prev.x * 0.95,
+            //   y: prev.y * 0.95,
+            //   z: prev.z * 0.95
+            // }))
+            // setHandDistance(prev => prev + (0.5 - prev) * 0.05)
+            
             setIsFacingCamera(false)
             
             // 每5秒提示一次未检测到手势

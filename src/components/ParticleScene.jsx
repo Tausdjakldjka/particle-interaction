@@ -23,8 +23,8 @@ function ParticleScene({ interactionStrength, handRotation, handDistance }) {
   const handRotationRef = useRef({ x: 0, y: 0, z: 0 })
   const handDistanceRef = useRef(0.5)
   const configRef = useRef({
-    particleCount: 15000,
-    particleSize: 0.05,
+    particleCount: 30000,  // 提升到30000（原15000，增加100%）
+    particleSize: 0.04,    // 稍微减小粒子大小以保持视觉平衡
     color: '#00ffff',
     shape: 'Heart',
     autoRotate: false,  // 改为false，使用手势控制
