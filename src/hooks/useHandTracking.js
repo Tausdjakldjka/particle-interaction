@@ -104,13 +104,54 @@ export function useHandTracking() {
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         
-        // 等待视频加载完成后开始检测循环
-        return new Promise((resolve) => {
-          videoRef.current.addEventListener('loadeddata', () => {
-            console.log('✓ 视频流准备就绪，开始手势检测')
-            startDetectionLoop()
-            resolve(true)
-          }, { once: true })
+        // {{ AURA-X: Modify - 添加超时保护和播放控制，防止视频加载挂起 }}
+        // 等待视频加载完成后开始检测循环（带超时保护）
+        return new Promise((resolve, reject) => {
+          const video = videoRef.current
+          
+          // 设置30秒超时
+          const timeoutId = setTimeout(() => {
+            console.error('视频加载超时')
+            reject(new Error('视频加载超时，请检查摄像头连接或尝试刷新页面'))
+          }, 30000)
+          
+          const onLoadedData = async () => {
+            clearTimeout(timeoutId)
+            console.log('✓ 视频元数据加载完成')
+            
+            try {
+              // 显式播放视频流
+              await video.play()
+              console.log('✓ 视频流开始播放')
+              
+              // 等待视频真正开始输出帧
+              const checkVideoReady = () => {
+                if (video.videoWidth > 0 && video.videoHeight > 0) {
+                  console.log(`✓ 视频尺寸确认: ${video.videoWidth}x${video.videoHeight}`)
+                  console.log('✓ 视频流准备就绪，开始手势检测')
+                  startDetectionLoop()
+                  resolve(true)
+                } else {
+                  console.log('等待视频尺寸信息...')
+                  setTimeout(checkVideoReady, 100)
+                }
+              }
+              checkVideoReady()
+              
+            } catch (playError) {
+              console.error('视频播放失败:', playError)
+              reject(new Error(`视频播放失败: ${playError.message}`))
+            }
+          }
+          
+          const onError = (error) => {
+            clearTimeout(timeoutId)
+            console.error('视频加载错误:', error)
+            reject(new Error('视频加载失败，请检查摄像头状态'))
+          }
+          
+          video.addEventListener('loadeddata', onLoadedData, { once: true })
+          video.addEventListener('error', onError, { once: true })
         })
       }
 
