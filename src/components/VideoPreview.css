@@ -33,6 +33,18 @@
   background: rgba(0, 255, 255, 0.1);
 }
 
+/* {{ AURA-X: Add - 正面复位状态高亮 }} */
+.gesture-indicator.facing {
+  border-color: rgba(0, 255, 100, 0.8);
+  background: rgba(0, 255, 100, 0.15);
+  box-shadow: 0 0 15px rgba(0, 255, 100, 0.3);
+}
+
+.gesture-indicator.facing .gesture-bar-fill {
+  background: linear-gradient(90deg, #00ff88, #00ffaa);
+  box-shadow: 0 0 10px rgba(0, 255, 100, 0.6);
+}
+
 .gesture-icon {
   font-size: 20px;
   text-align: center;

@@ -25,28 +25,47 @@ export function initParticleShapes(count) {
   }
 
   for (let i = 0; i < count; i++) {
-    // {{ AURA-X: Modify - 优化心形，使用更饱满圆润的3D心形算法 }}
-    // 心形 - 使用改进的参数化方程，更饱满立体
-    const t = Math.random() * Math.PI * 2
-    const rH = Math.pow(Math.random(), 0.25)  // 更集中的分布
+    // {{ AURA-X: Modify - 使用超饱满圆润的3D心形算法，粒子铺满整个体积 }}
+    // 心形 - 采用体积填充而非表面分布
+    const u = Math.random() * Math.PI * 2  // 水平角度
+    const v = Math.random() * Math.PI      // 垂直角度
+    const rH = Math.pow(Math.random(), 0.3)  // 径向分布
     
-    // 改进的心形方程：更圆润、饱满
-    let x = 16 * Math.pow(Math.sin(t), 3)
-    let y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)
+    // 基础心形轮廓（极坐标方程）
+    const t = u
+    let baseX = 16 * Math.pow(Math.sin(t), 3)
+    let baseY = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)
     
-    // 3D深度：基于心形轮廓创建体积感
-    const heartRadius = Math.sqrt(x * x + y * y) / 20  // 归一化半径
-    const depthProfile = Math.sqrt(Math.max(0, 1 - Math.pow(heartRadius, 1.5)))  // 凸起轮廓
-    let z = (Math.random() - 0.5) * 8 * depthProfile  // 中心厚，边缘薄
+    // 计算到中心的归一化距离
+    const baseR = Math.sqrt(baseX * baseX + baseY * baseY)
+    const normalizedR = baseR / 20
     
-    // 缩放调整：让心形更大更饱满
-    x *= 0.18 * rH
-    y *= 0.18 * rH  
-    z *= rH * 0.8  // Z轴稍薄，保持优美形态
+    // 3D体积厚度：使用球形插值创建饱满的体积
+    // 使用更平缓的衰减函数，让整个体积都充满粒子
+    const depthRadius = Math.sqrt(Math.max(0, 1 - Math.pow(normalizedR, 1.2))) * 1.5
     
-    // 整体向上偏移，让心形居中更好看
+    // 在深度方向上均匀分布（球形坐标）
+    const theta = Math.acos(2 * Math.random() - 1)  // 均匀球面分布
+    const phi = Math.random() * Math.PI * 2
+    
+    // 计算3D位置
+    let x = baseX * rH
+    let y = baseY * rH
+    let z = depthRadius * rH * Math.sin(theta) * Math.cos(phi) * 10
+    
+    // 让心形更圆润：对尖角部分进行平滑处理
+    const smoothFactor = Math.max(0, 1 - Math.abs(baseY) / 25)
+    x *= (1 + smoothFactor * 0.2)
+    y *= (1 + smoothFactor * 0.15)
+    
+    // 缩放到合适大小：更大更饱满
+    x *= 0.22
+    y *= 0.22
+    z *= 0.18
+    
+    // 整体向上偏移并微微向前
     shapes.Heart[i * 3] = x
-    shapes.Heart[i * 3 + 1] = y + 0.5
+    shapes.Heart[i * 3 + 1] = y + 0.8
     shapes.Heart[i * 3 + 2] = z
 
     // 球体 (斐波那契球)

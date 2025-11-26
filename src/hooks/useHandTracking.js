@@ -7,9 +7,10 @@ import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision'
  */
 export function useHandTracking() {
   const [interactionStrength, setInteractionStrength] = useState(0)
-  // {{ AURA-X: Add - 增加手掌旋转角度和距离状态 }}
+  // {{ AURA-X: Add - 增加手掌旋转角度、距离和正面状态 }}
   const [handRotation, setHandRotation] = useState({ x: 0, y: 0, z: 0 })
   const [handDistance, setHandDistance] = useState(0)
+  const [isFacingCamera, setIsFacingCamera] = useState(false)
   const videoRef = useRef(null)
   const handLandmarkerRef = useRef(null)
   const visionContextRef = useRef(null)
@@ -289,10 +290,20 @@ export function useHandTracking() {
               normal.z /= normalLength
             }
             
+            // {{ AURA-X: Modify - 添加手掌正面检测，Z轴法向量接近-1时为正面 }}
             // 计算欧拉角（相对于初始姿态）
             const rotationX = Math.atan2(normal.y, normal.z) * (180 / Math.PI)  // 俯仰（pitch）
             const rotationY = Math.atan2(-normal.x, Math.sqrt(normal.y * normal.y + normal.z * normal.z)) * (180 / Math.PI)  // 偏航（yaw）
             const rotationZ = Math.atan2(v1.y, v1.x) * (180 / Math.PI)  // 翻滚（roll）
+            
+            // 检测手掌是否正对摄像头（法向量Z分量接近-1）
+            // 阈值：0.8 表示手掌与摄像头夹角小于约36度
+            const isFacingCamera = normal.z < -0.8
+            
+            // 如果手掌正面，将旋转角度归零（复位）
+            const finalRotationX = isFacingCamera ? 0 : rotationX
+            const finalRotationY = isFacingCamera ? 0 : rotationY
+            const finalRotationZ = isFacingCamera ? 0 : rotationZ
             
             // {{ AURA-X: Add - 计算手掌距离（基于手掌大小）}}
             // 使用手掌宽度（食指根到小指根）作为深度指标
@@ -310,20 +321,25 @@ export function useHandTracking() {
               return newValue
             })
             
-            // 平滑过渡旋转角度
+            // 平滑过渡旋转角度（正面时快速复位）
+            const resetSpeed = isFacingCamera ? 0.3 : 0.2
             setHandRotation(prev => ({
-              x: prev.x + (rotationX - prev.x) * 0.2,
-              y: prev.y + (rotationY - prev.y) * 0.2,
-              z: prev.z + (rotationZ - prev.z) * 0.2
+              x: prev.x + (finalRotationX - prev.x) * resetSpeed,
+              y: prev.y + (finalRotationY - prev.y) * resetSpeed,
+              z: prev.z + (finalRotationZ - prev.z) * resetSpeed
             }))
             
             // 平滑过渡距离
             setHandDistance(prev => prev + (distance - prev) * 0.15)
             
+            // 更新正面状态
+            setIsFacingCamera(isFacingCamera)
+            
             // 每3秒输出一次调试信息
             const now = Date.now()
             if (now - lastDebugTime > 3000) {
-              console.log(`🖐️ 手势 | 强度: ${strength.toFixed(2)} | 旋转: (${rotationX.toFixed(0)}°, ${rotationY.toFixed(0)}°, ${rotationZ.toFixed(0)}°) | 距离: ${distance.toFixed(2)}`)
+              const facing = isFacingCamera ? '✋正面' : '🔄侧面'
+              console.log(`🖐️ 手势 | 强度: ${strength.toFixed(2)} | ${facing} | 旋转: (${finalRotationX.toFixed(0)}°, ${finalRotationY.toFixed(0)}°, ${finalRotationZ.toFixed(0)}°) | 距离: ${distance.toFixed(2)}`)
               lastDebugTime = now
             }
           } else {
@@ -335,6 +351,7 @@ export function useHandTracking() {
               z: prev.z * 0.95
             }))
             setHandDistance(prev => prev + (0.5 - prev) * 0.05)  // 回到中间位置
+            setIsFacingCamera(false)
             
             // 每5秒提示一次未检测到手势
             frameCount++
@@ -370,6 +387,7 @@ export function useHandTracking() {
     interactionStrength,
     handRotation,
     handDistance,
+    isFacingCamera,
     initHandTracking
   }
 }
