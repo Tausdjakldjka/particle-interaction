@@ -92,7 +92,8 @@ function App() {
         />
       )}
 
-      <VideoPreview videoRef={videoRef} />
+      {/* {{ AURA-X: Modify - 传递 interactionStrength 给 VideoPreview 以显示检测状态 }} */}
+      <VideoPreview videoRef={videoRef} interactionStrength={interactionStrength} />
       <ParticleScene interactionStrength={interactionStrength} />
       <FullscreenButton />
     </div>

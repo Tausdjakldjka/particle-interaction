@@ -166,8 +166,12 @@ export function useHandTracking() {
 
   /**
    * 手势检测循环
+   * {{ AURA-X: Modify - 增强调试信息，帮助追踪手势检测状态 }}
    */
   const startDetectionLoop = () => {
+    let frameCount = 0
+    let lastDebugTime = Date.now()
+    
     const detect = () => {
       const video = videoRef.current
       const landmarker = handLandmarkerRef.current
@@ -196,10 +200,31 @@ export function useHandTracking() {
             strength = Math.max(0, Math.min(1, strength))
 
             // 平滑过渡
-            setInteractionStrength(prev => prev + (strength - prev) * 0.1)
+            setInteractionStrength(prev => {
+              const newValue = prev + (strength - prev) * 0.1
+              
+              // 每3秒输出一次调试信息
+              const now = Date.now()
+              if (now - lastDebugTime > 3000) {
+                console.log(`🖐️ 手势检测活跃 | 距离: ${dist.toFixed(3)} | 强度: ${newValue.toFixed(3)}`)
+                lastDebugTime = now
+              }
+              
+              return newValue
+            })
           } else {
             // 没有检测到手势，逐渐归零
-            setInteractionStrength(prev => prev + (0 - prev) * 0.05)
+            setInteractionStrength(prev => {
+              const newValue = prev + (0 - prev) * 0.05
+              
+              // 每5秒提示一次未检测到手势
+              frameCount++
+              if (frameCount % 300 === 0) {
+                console.log('👋 未检测到手势，请将手放在摄像头前')
+              }
+              
+              return newValue
+            })
           }
         }
       }
@@ -207,6 +232,7 @@ export function useHandTracking() {
       animationFrameRef.current = requestAnimationFrame(detect)
     }
 
+    console.log('🎬 手势检测循环已启动')
     detect()
   }
 

@@ -18,6 +18,8 @@ function ParticleScene({ interactionStrength }) {
   const particlesRef = useRef(null)
   const shapesRef = useRef(null)
   const guiRef = useRef(null)
+  // {{ AURA-X: Add - 使用 ref 存储最新的 interactionStrength，避免闭包问题 }}
+  const interactionStrengthRef = useRef(0)
   const configRef = useRef({
     particleCount: 15000,
     particleSize: 0.05,
@@ -107,11 +109,13 @@ function ParticleScene({ interactionStrength }) {
 
       controls.update()
 
+      // {{ AURA-X: Modify - 使用 ref 获取最新的交互强度值 }}
       // 更新粒子位置
       const pos = particles.geometry.attributes.position.array
       const target = shapesRef.current[config.shape]
-      const scale = 1 + interactionStrength * 2.0
-      const jitter = interactionStrength * 0.1
+      const currentStrength = interactionStrengthRef.current
+      const scale = 1 + currentStrength * 2.0
+      const jitter = currentStrength * 0.1
 
       for (let i = 0; i < config.particleCount; i++) {
         const idx = i * 3
@@ -127,7 +131,7 @@ function ParticleScene({ interactionStrength }) {
       particles.geometry.attributes.position.needsUpdate = true
 
       // 强交互时旋转粒子
-      if (interactionStrength > 0.5) {
+      if (currentStrength > 0.5) {
         particles.rotation.y += 0.02
       }
 
@@ -158,8 +162,12 @@ function ParticleScene({ interactionStrength }) {
     }
   }, [])
 
+  // {{ AURA-X: Modify - 同步更新 ref 和 GUI 显示 }}
   // 更新GUI中的交互强度显示
   useEffect(() => {
+    // 更新 ref 为最新值
+    interactionStrengthRef.current = interactionStrength
+    
     if (guiRef.current) {
       const controller = guiRef.current.controllers.find(c => c.property === 'interactionStrength')
       if (controller) {
