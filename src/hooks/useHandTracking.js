@@ -361,10 +361,11 @@ export function useHandTracking() {
             const rotationY = Math.atan2(-normal.x, Math.sqrt(normal.y * normal.y + normal.z * normal.z)) * (180 / Math.PI)  // 偏航（yaw）
             const rotationZ = Math.atan2(v1.y, v1.x) * (180 / Math.PI)  // 翻滚（roll）
             
+            // {{ AURA-X: Modify - 进一步提高正面检测阈值，减少误触发 }}
             // 检测手掌背面是否朝向摄像头（法向量Z分量接近+1，即手掌心朝向自己）
-            // 这样的姿态是"标准正面"，用于复位模型
-            // 提高阈值，只有非常明确的正面才触发复位
-            const isFacingCamera = normal.z > 0.85  // 手掌背面朝摄像头（提高阈值，避免误触发）
+            // 这样的姿态是"标准正面"，用于复位模型旋转
+            // 提高阈值到0.92，只有非常明确的正面才触发复位
+            const isFacingCamera = normal.z > 0.92  // 手掌背面朝摄像头（更高阈值，减少误触发）
             
             // 如果手掌正面，将旋转角度归零（复位）
             const finalRotationX = isFacingCamera ? 0 : rotationX
@@ -382,27 +383,26 @@ export function useHandTracking() {
             // 修正映射关系：palmWidth 0.08-0.25 → distance 1.0-0.0
             const distance = Math.max(0, Math.min(1, (0.25 - palmWidth) / (0.25 - 0.08)))
 
-            // {{ AURA-X: Modify - 正面时也保持开合功能 }}
-            // 平滑过渡（正面时也响应手势开合）
+            // {{ AURA-X: Modify - 提高响应灵敏度，让交互更跟手 }}
+            // 平滑过渡（响应手势开合），提高响应速度
             setInteractionStrength(prev => {
-              const newValue = prev + (strength - prev) * 0.15
+              const newValue = prev + (strength - prev) * 0.25  // 提高到0.25，更灵敏
               return newValue
             })
             
-            // 平滑过渡旋转角度（正面时快速复位）
-            const resetSpeed = isFacingCamera ? 0.3 : 0.2
+            // {{ AURA-X: Modify - 提高旋转响应速度，让交互更流畅 }}
+            // 平滑过渡旋转角度（正面时快速复位，其他时候也提高响应速度）
+            const resetSpeed = isFacingCamera ? 0.35 : 0.25
             setHandRotation(prev => ({
               x: prev.x + (finalRotationX - prev.x) * resetSpeed,
               y: prev.y + (finalRotationY - prev.y) * resetSpeed,
               z: prev.z + (finalRotationZ - prev.z) * resetSpeed
             }))
             
-            // {{ AURA-X: Modify - 正面时距离也复位到中间位置 }}
-            // 平滑过渡距离（正面时强制为0.5，即中间位置）
-            const finalDistance = isFacingCamera ? 0.5 : distance
+            // {{ AURA-X: Modify - 移除距离强制复位，让距离始终跟手 }}
+            // 平滑过渡距离（始终响应手掌大小变化，提高响应速度）
             setHandDistance(prev => {
-              const resetSpeed = isFacingCamera ? 0.3 : 0.15
-              return prev + (finalDistance - prev) * resetSpeed
+              return prev + (distance - prev) * 0.25  // 提高到0.25，更灵敏
             })
             
             // 更新正面状态
