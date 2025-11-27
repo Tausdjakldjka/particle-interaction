@@ -188,21 +188,21 @@ function ParticleScene({ interactionStrength, handRotation, handDistance, isFaci
       const currentRotation = handRotationRef.current
       const currentDistance = handDistanceRef.current
       
-      // {{ AURA-X: Modify - 握紧拳头时粒子极度收缩成一团 + 呼吸律动效果 + 丝滑过渡 }}
+      // {{ AURA-X: Modify - 比心手势时固定最佳展示scale，文字完整清晰 }}
       // 呼吸效果：使用正弦波创造律动感
       const breathingPhase = Math.sin(Date.now() * 0.001 * config.breathingSpeed * Math.PI * 2)
       const breathingScale = 1 + breathingPhase * config.breathingIntensity  // 0.85 → 1.15
       
-      // 动态缩放：握拳时缩成一团（0.05倍），张开时扩散（4倍），叠加呼吸效果
-      const baseScale = 0.05 + currentStrength * 3.95  // 0.05 → 4.0
+      // 动态缩放：比心时固定为3.0（最佳展示大小），其他时候根据手势开合
+      const baseScale = isHeartGesture ? 3.0 : (0.05 + currentStrength * 3.95)  // 比心时固定大小
       const scale = baseScale * breathingScale  // 加上呼吸律动
       
-      // 动态抖动：根据强度添加粒子抖动效果
-      const jitter = currentStrength * 0.2  // 提高抖动效果
+      // 动态抖动：比心时无抖动（保持文字清晰），其他时候根据强度
+      const jitter = isHeartGesture ? 0 : (currentStrength * 0.2)  // 比心时无抖动
       
-      // {{ AURA-X: Modify - 提高响应速度，让收缩更丝滑 }}
-      // 动态速度：使用平滑曲线，让过渡更自然
-      const lerpSpeed = 0.08 + currentStrength * 0.12  // 提高基础速度和变化范围
+      // {{ AURA-X: Modify - 比心手势时超快速切换，实现丝滑效果 }}
+      // 动态速度：比心手势时立即加速到0.3（3倍速），实现秒切换
+      const lerpSpeed = isHeartGesture ? 0.3 : (0.08 + currentStrength * 0.12)  // 比心时超快切换
 
       for (let i = 0; i < config.particleCount; i++) {
         const idx = i * 3
@@ -240,16 +240,25 @@ function ParticleScene({ interactionStrength, handRotation, handDistance, isFaci
       const targetZ = Math.max(config.minDistance, Math.min(config.maxDistance, rawTargetZ))
       camera.position.z += (targetZ - camera.position.z) * 0.1
       
-      // {{ AURA-X: Modify - 增强粒子视觉变化 + 呼吸透明度 }}
-      // 材质透明度随强度变化（握紧时更暗，张开时更亮），叠加呼吸效果
+      // {{ AURA-X: Modify - 比心手势时强化视觉效果：更亮、更大、更浪漫 }}
+      // 材质透明度和大小优化
       if (particles.material) {
-        const baseOpacity = 0.4 + currentStrength * 0.5  // 0.4 → 0.9
+        // 比心时固定为最亮（0.95），其他时候根据强度
+        const baseOpacity = isHeartGesture ? 0.95 : (0.4 + currentStrength * 0.5)  // 比心时最亮
         const breathingOpacity = breathingPhase * 0.1  // ±0.1
         particles.material.opacity = baseOpacity + breathingOpacity
         
-        const baseSize = config.particleSize * (0.5 + currentStrength * 1.0)  // 0.5x → 1.5x
+        // 比心时粒子变大（1.8倍），更清晰显示文字
+        const baseSize = isHeartGesture ? (config.particleSize * 1.8) : (config.particleSize * (0.5 + currentStrength * 1.0))
         const breathingSize = baseSize * (1 + breathingPhase * 0.05)  // ±5%
         particles.material.size = breathingSize
+        
+        // {{ AURA-X: Add - 比心时颜色变为浪漫粉红色 }}
+        if (isHeartGesture) {
+          particles.material.color.setHex(0xff69b4)  // 浪漫粉红色 (HotPink)
+        } else {
+          particles.material.color.set(config.color)  // 恢复原始颜色
+        }
       }
 
       renderer.render(scene, camera)
