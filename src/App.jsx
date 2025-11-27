@@ -13,8 +13,8 @@ function App() {
   const [errorMessage, setErrorMessage] = useState("");
   const initStartedRef = useRef(false);
 
-  // {{ AURA-X: Modify - 获取增强的手势数据：开合度、旋转、距离、正面状态 }}
-  const { videoRef, interactionStrength, handRotation, handDistance, isFacingCamera, initHandTracking } = useHandTracking();
+  // {{ AURA-X: Modify - 获取增强的手势数据：开合度、旋转、距离、正面状态、比心手势 }}
+  const { videoRef, interactionStrength, handRotation, handDistance, isFacingCamera, isHeartGesture, initHandTracking } = useHandTracking();
 
   // 自动初始化逻辑
   // {{ AURA-X: Modify - 使用 ref 防止重复初始化 }}
@@ -98,12 +98,14 @@ function App() {
         videoRef={videoRef} 
         interactionStrength={interactionStrength}
         isFacingCamera={isFacingCamera}
+        isHeartGesture={isHeartGesture}
       />
       <ParticleScene 
         interactionStrength={interactionStrength}
         handRotation={handRotation}
         handDistance={handDistance}
         isFacingCamera={isFacingCamera}
+        isHeartGesture={isHeartGesture}
       />
       <FullscreenButton />
     </div>

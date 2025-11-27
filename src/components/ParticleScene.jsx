@@ -9,7 +9,7 @@ import './ParticleScene.css'
  * Three.js粒子场景组件
  * {{ AURA-X: Create - 将Three.js渲染逻辑封装为React组件 }}
  */
-function ParticleScene({ interactionStrength, handRotation, handDistance, isFacingCamera }) {
+function ParticleScene({ interactionStrength, handRotation, handDistance, isFacingCamera, isHeartGesture }) {
   const containerRef = useRef(null)
   const sceneRef = useRef(null)
   const rendererRef = useRef(null)
@@ -35,7 +35,9 @@ function ParticleScene({ interactionStrength, handRotation, handDistance, isFaci
     rotationSensitivity: 0.01,
     distanceSensitivity: 3.0,  // 降低灵敏度（原5.0）
     minDistance: 6,     // 最近距离
-    maxDistance: 12     // 最远距离（确保模型可见）
+    maxDistance: 12,    // 最远距离（确保模型可见）
+    breathingSpeed: 1.5,   // {{ AURA-X: Add - 呼吸频率（每秒周期数）}}
+    breathingIntensity: 0.15  // {{ AURA-X: Add - 呼吸强度（缩放幅度）}}
   })
 
   // 初始化Three.js场景
@@ -113,6 +115,8 @@ function ParticleScene({ interactionStrength, handRotation, handDistance, isFaci
     gestureFolder.add(config, 'distanceSensitivity', 1, 5).name('距离灵敏度')
     gestureFolder.add(config, 'minDistance', 4, 8).name('最近距离')
     gestureFolder.add(config, 'maxDistance', 8, 15).name('最远距离')
+    gestureFolder.add(config, 'breathingSpeed', 0.5, 3).name('💓 呼吸频率')
+    gestureFolder.add(config, 'breathingIntensity', 0, 0.3).name('💓 呼吸强度')
     gestureFolder.add(config, 'autoRotate').name('自动旋转').onChange(value => {
       controls.autoRotate = value
     })
@@ -145,21 +149,30 @@ function ParticleScene({ interactionStrength, handRotation, handDistance, isFaci
       controls.update()
 
       // {{ AURA-X: Modify - 增强手势控制：开合度、旋转、距离 }}
+      // {{ AURA-X: Modify - 比心手势时切换到爱的文字 }}
       // 更新粒子位置
       const pos = particles.geometry.attributes.position.array
-      const target = shapesRef.current[config.shape]
+      // 比心手势时切换到"我爱你韩妮妮"文字，否则保持当前形状
+      const currentShape = isHeartGesture ? 'LoveText' : config.shape
+      const target = shapesRef.current[currentShape]
       const currentStrength = interactionStrengthRef.current
       const currentRotation = handRotationRef.current
       const currentDistance = handDistanceRef.current
       
-      // 动态缩放：手张开时粒子扩散，握拳时粒子收缩
-      const scale = 1 + currentStrength * 3.0
+      // {{ AURA-X: Modify - 握紧拳头时粒子极度收缩成一团 + 呼吸律动效果 }}
+      // 呼吸效果：使用正弦波创造律动感
+      const breathingPhase = Math.sin(Date.now() * 0.001 * config.breathingSpeed * Math.PI * 2)
+      const breathingScale = 1 + breathingPhase * config.breathingIntensity  // 0.85 → 1.15
+      
+      // 动态缩放：握拳时缩成一团（0.05倍），张开时扩散（4倍），叠加呼吸效果
+      const baseScale = 0.05 + currentStrength * 3.95  // 0.05 → 4.0
+      const scale = baseScale * breathingScale  // 加上呼吸律动
       
       // 动态抖动：根据强度添加粒子抖动效果
-      const jitter = currentStrength * 0.15
+      const jitter = currentStrength * 0.2  // 提高抖动效果
       
       // 动态速度：强度越高，粒子响应越快
-      const lerpSpeed = 0.04 + currentStrength * 0.08
+      const lerpSpeed = 0.05 + currentStrength * 0.15  // 提高响应速度
 
       for (let i = 0; i < config.particleCount; i++) {
         const idx = i * 3
@@ -197,10 +210,16 @@ function ParticleScene({ interactionStrength, handRotation, handDistance, isFaci
       const targetZ = Math.max(config.minDistance, Math.min(config.maxDistance, rawTargetZ))
       camera.position.z += (targetZ - camera.position.z) * 0.1
       
-      // 材质透明度随强度变化
+      // {{ AURA-X: Modify - 增强粒子视觉变化 + 呼吸透明度 }}
+      // 材质透明度随强度变化（握紧时更暗，张开时更亮），叠加呼吸效果
       if (particles.material) {
-        particles.material.opacity = 0.6 + currentStrength * 0.3
-        particles.material.size = config.particleSize * (1 + currentStrength * 0.5)
+        const baseOpacity = 0.4 + currentStrength * 0.5  // 0.4 → 0.9
+        const breathingOpacity = breathingPhase * 0.1  // ±0.1
+        particles.material.opacity = baseOpacity + breathingOpacity
+        
+        const baseSize = config.particleSize * (0.5 + currentStrength * 1.0)  // 0.5x → 1.5x
+        const breathingSize = baseSize * (1 + breathingPhase * 0.05)  // ±5%
+        particles.material.size = breathingSize
       }
 
       renderer.render(scene, camera)

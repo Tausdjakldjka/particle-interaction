@@ -45,6 +45,24 @@
   box-shadow: 0 0 10px rgba(0, 255, 100, 0.6);
 }
 
+/* {{ AURA-X: Add - 比心手势状态高亮 }} */
+.gesture-indicator.heart-gesture {
+  border-color: rgba(255, 20, 147, 1.0);
+  background: rgba(255, 20, 147, 0.2);
+  box-shadow: 0 0 20px rgba(255, 20, 147, 0.6);
+  animation: heartbeat 1s infinite;
+}
+
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.gesture-indicator.heart-gesture .gesture-bar-fill {
+  background: linear-gradient(90deg, #ff1493, #ff69b4);
+  box-shadow: 0 0 15px rgba(255, 20, 147, 0.8);
+}
+
 .gesture-icon {
   font-size: 20px;
   text-align: center;

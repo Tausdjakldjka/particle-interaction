@@ -18,6 +18,8 @@ export function useHandTracking() {
   const [handRotation, setHandRotation] = useState({ x: 0, y: 0, z: 0 })
   const [handDistance, setHandDistance] = useState(0)
   const [isFacingCamera, setIsFacingCamera] = useState(false)
+  // {{ AURA-X: Add - 比心手势检测 }}
+  const [isHeartGesture, setIsHeartGesture] = useState(false)
   const videoRef = useRef(null)
   const handLandmarkerRef = useRef(null)
   const visionContextRef = useRef(null)
@@ -264,10 +266,64 @@ export function useHandTracking() {
             // 增强灵敏度：应用曲线调整
             strength = Math.pow(strength, 0.8)  // 使响应更灵敏
 
-            // {{ AURA-X: Add - 计算手掌旋转角度（基于手掌平面法向量）}}
-            // 使用手腕、食指根部、小指根部构建手掌平面
+            // {{ AURA-X: Add - 比心手势识别 }}
+            // 检测大拇指和食指是否形成比心手势
+            const thumbBase = hand[2]   // 拇指根部
             const indexBase = hand[5]   // 食指根部
-            const pinkyBase = hand[17]  // 小指根部
+            const pinkyBase = hand[17]  // 小指根部（后面旋转计算会用到）
+            
+            // 1. 计算拇指尖和食指尖的距离
+            const tipDistance = Math.sqrt(
+              Math.pow(thumbTip.x - indexTip.x, 2) + 
+              Math.pow(thumbTip.y - indexTip.y, 2)
+            )
+            
+            // 2. 计算拇指和食指的角度
+            const thumbVector = {
+              x: thumbTip.x - thumbBase.x,
+              y: thumbTip.y - thumbBase.y
+            }
+            const indexVector = {
+              x: indexTip.x - indexBase.x,
+              y: indexTip.y - indexBase.y
+            }
+            
+            // 计算两个向量的夹角
+            const dotProduct = thumbVector.x * indexVector.x + thumbVector.y * indexVector.y
+            const thumbLength = Math.sqrt(thumbVector.x * thumbVector.x + thumbVector.y * thumbVector.y)
+            const indexLength = Math.sqrt(indexVector.x * indexVector.x + indexVector.y * indexVector.y)
+            const angle = Math.acos(dotProduct / (thumbLength * indexLength)) * (180 / Math.PI)
+            
+            // 3. 检测其他手指是否弯曲
+            const middleBent = Math.sqrt(
+              Math.pow(middleTip.x - wrist.x, 2) + 
+              Math.pow(middleTip.y - wrist.y, 2)
+            ) < 0.15
+            const ringBent = Math.sqrt(
+              Math.pow(ringTip.x - wrist.x, 2) + 
+              Math.pow(ringTip.y - wrist.y, 2)
+            ) < 0.15
+            const pinkyBent = Math.sqrt(
+              Math.pow(pinkyTip.x - wrist.x, 2) + 
+              Math.pow(pinkyTip.y - wrist.y, 2)
+            ) < 0.15
+            
+            // 比心手势判断条件：
+            // - 拇指和食指尖距离近（< 0.05）
+            // - 两指夹角在30-90度之间
+            // - 其他三指至少有两个弯曲
+            const otherFingersBent = (middleBent ? 1 : 0) + (ringBent ? 1 : 0) + (pinkyBent ? 1 : 0)
+            const isHeart = tipDistance < 0.05 && angle > 30 && angle < 90 && otherFingersBent >= 2
+            
+            setIsHeartGesture(isHeart)
+            
+            if (isHeart) {
+              console.log('💕 检测到比心手势！')
+            }
+
+            // {{ AURA-X: Add - 计算手掌旋转角度（基于手掌平面法向量）}}
+            // 使用手腕、食指根部、小指根部构建手掌平面（复用上面的变量）
+            // indexBase 和 pinkyBase 已在比心手势识别中声明
             const middleBase = hand[9]  // 中指根部（辅助点）
             
             // 计算手掌的两个方向向量
@@ -372,6 +428,7 @@ export function useHandTracking() {
             // setHandDistance(prev => prev + (0.5 - prev) * 0.05)
             
             setIsFacingCamera(false)
+            setIsHeartGesture(false)  // 未检测到手势时，比心也失效
             
             // 每5秒提示一次未检测到手势
             frameCount++
@@ -408,6 +465,7 @@ export function useHandTracking() {
     handRotation,
     handDistance,
     isFacingCamera,
+    isHeartGesture,  // {{ AURA-X: Add - 导出比心手势状态 }}
     initHandTracking
   }
 }

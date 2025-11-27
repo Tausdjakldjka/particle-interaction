@@ -15,13 +15,67 @@
  * @param {number} count - 粒子数量
  * @returns {Object} 包含所有形状的对象
  */
+/**
+ * 从Canvas文字生成粒子位置
+ */
+function generateTextParticles(text, count) {
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')
+  
+  // 设置画布大小
+  canvas.width = 800
+  canvas.height = 300
+  
+  // 设置文字样式
+  ctx.fillStyle = 'white'
+  ctx.font = 'bold 80px "Microsoft YaHei", "PingFang SC", sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  
+  // 绘制文字
+  ctx.fillText(text, canvas.width / 2, canvas.height / 2)
+  
+  // 获取像素数据
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  const pixels = imageData.data
+  
+  // 找出所有文字像素点
+  const textPixels = []
+  for (let y = 0; y < canvas.height; y += 2) {
+    for (let x = 0; x < canvas.width; x += 2) {
+      const i = (y * canvas.width + x) * 4
+      if (pixels[i + 3] > 128) {  // alpha > 128
+        textPixels.push({
+          x: (x - canvas.width / 2) / 100,
+          y: -(y - canvas.height / 2) / 100,
+          z: 0
+        })
+      }
+    }
+  }
+  
+  // 采样到指定数量的粒子
+  const positions = new Float32Array(count * 3)
+  for (let i = 0; i < count; i++) {
+    if (textPixels.length > 0) {
+      const pixel = textPixels[Math.floor(Math.random() * textPixels.length)]
+      positions[i * 3] = pixel.x + (Math.random() - 0.5) * 0.1
+      positions[i * 3 + 1] = pixel.y + (Math.random() - 0.5) * 0.1
+      positions[i * 3 + 2] = pixel.z + (Math.random() - 0.5) * 0.5
+    }
+  }
+  
+  return positions
+}
+
 export function initParticleShapes(count) {
   const shapes = {
     Heart: new Float32Array(count * 3),
     Sphere: new Float32Array(count * 3),
     Flower: new Float32Array(count * 3),
     Knot: new Float32Array(count * 3),
-    Fireworks: new Float32Array(count * 3)
+    Fireworks: new Float32Array(count * 3),
+    LoveText: generateTextParticles('我爱你韩妮妮', count)  // {{ AURA-X: Add - 爱的文字 }}
   }
 
   for (let i = 0; i < count; i++) {
