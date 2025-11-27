@@ -17,18 +17,19 @@
  */
 /**
  * 从Canvas文字生成粒子位置
+ * {{ AURA-X: Modify - 优化文字粒子生成，更清晰可见 }}
  */
 function generateTextParticles(text, count) {
   const canvas = document.createElement('canvas')
   const ctx = canvas.getContext('2d')
   
-  // 设置画布大小
-  canvas.width = 800
-  canvas.height = 300
+  // 设置画布大小（加大以获得更多细节）
+  canvas.width = 1200
+  canvas.height = 400
   
   // 设置文字样式
   ctx.fillStyle = 'white'
-  ctx.font = 'bold 80px "Microsoft YaHei", "PingFang SC", sans-serif'
+  ctx.font = 'bold 100px "Microsoft YaHei", "PingFang SC", "SimHei", sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   
@@ -39,29 +40,37 @@ function generateTextParticles(text, count) {
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
   const pixels = imageData.data
   
-  // 找出所有文字像素点
+  // 找出所有文字像素点（降低采样率以获得更多点）
   const textPixels = []
-  for (let y = 0; y < canvas.height; y += 2) {
-    for (let x = 0; x < canvas.width; x += 2) {
+  for (let y = 0; y < canvas.height; y += 3) {
+    for (let x = 0; x < canvas.width; x += 3) {
       const i = (y * canvas.width + x) * 4
-      if (pixels[i + 3] > 128) {  // alpha > 128
+      if (pixels[i + 3] > 100) {  // alpha > 100（降低阈值）
         textPixels.push({
-          x: (x - canvas.width / 2) / 100,
-          y: -(y - canvas.height / 2) / 100,
+          x: (x - canvas.width / 2) / 120,  // 缩放到合适大小
+          y: -(y - canvas.height / 2) / 120,
           z: 0
         })
       }
     }
   }
   
+  console.log(`💕 文字粒子点数: ${textPixels.length}`)
+  
   // 采样到指定数量的粒子
   const positions = new Float32Array(count * 3)
   for (let i = 0; i < count; i++) {
     if (textPixels.length > 0) {
       const pixel = textPixels[Math.floor(Math.random() * textPixels.length)]
-      positions[i * 3] = pixel.x + (Math.random() - 0.5) * 0.1
-      positions[i * 3 + 1] = pixel.y + (Math.random() - 0.5) * 0.1
-      positions[i * 3 + 2] = pixel.z + (Math.random() - 0.5) * 0.5
+      // 添加轻微随机偏移
+      positions[i * 3] = pixel.x + (Math.random() - 0.5) * 0.05
+      positions[i * 3 + 1] = pixel.y + (Math.random() - 0.5) * 0.05
+      positions[i * 3 + 2] = pixel.z + (Math.random() - 0.5) * 0.3  // Z轴深度
+    } else {
+      // 如果没有文字点，放在原点
+      positions[i * 3] = 0
+      positions[i * 3 + 1] = 0
+      positions[i * 3 + 2] = 0
     }
   }
   

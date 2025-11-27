@@ -33,11 +33,11 @@ function ParticleScene({ interactionStrength, handRotation, handDistance, isFaci
     shape: 'Heart',
     autoRotate: false,  // 改为false，使用手势控制
     rotationSensitivity: 0.01,
-    distanceSensitivity: 3.0,  // 降低灵敏度（原5.0）
-    minDistance: 6,     // 最近距离
-    maxDistance: 12,    // 最远距离（确保模型可见）
-    breathingSpeed: 1.5,   // {{ AURA-X: Add - 呼吸频率（每秒周期数）}}
-    breathingIntensity: 0.15  // {{ AURA-X: Add - 呼吸强度（缩放幅度）}}
+    distanceSensitivity: 2.0,  // {{ AURA-X: Modify - 降低灵敏度，减少距离变化幅度 }}
+    minDistance: 4,     // {{ AURA-X: Modify - 最近距离（原来6，现在更近）}}
+    maxDistance: 8,     // {{ AURA-X: Modify - 最远距离（原来12，现在更近）}}
+    breathingSpeed: 1.5,   // 呼吸频率（每秒周期数）
+    breathingIntensity: 0.15  // 呼吸强度（缩放幅度）
   })
 
   // 初始化Three.js场景
@@ -59,8 +59,9 @@ function ParticleScene({ interactionStrength, handRotation, handDistance, isFaci
       0.1,
       1000
     )
-    camera.position.z = 8
-    camera.position.y = 2
+    // {{ AURA-X: Modify - 调整初始相机位置，更近更清晰 }}
+    camera.position.z = 6  // 原来8，现在6，更近
+    camera.position.y = 1  // 原来2，现在1，视角更平
     cameraRef.current = camera
 
     // 创建渲染器
@@ -155,11 +156,16 @@ function ParticleScene({ interactionStrength, handRotation, handDistance, isFaci
       // 比心手势时切换到"我爱你韩妮妮"文字，否则保持当前形状
       const currentShape = isHeartGesture ? 'LoveText' : config.shape
       const target = shapesRef.current[currentShape]
+      
+      // 调试：每5秒输出一次当前形状
+      if (Math.random() < 0.005) {
+        console.log('🎨 当前形状:', currentShape, 'isHeartGesture:', isHeartGesture)
+      }
       const currentStrength = interactionStrengthRef.current
       const currentRotation = handRotationRef.current
       const currentDistance = handDistanceRef.current
       
-      // {{ AURA-X: Modify - 握紧拳头时粒子极度收缩成一团 + 呼吸律动效果 }}
+      // {{ AURA-X: Modify - 握紧拳头时粒子极度收缩成一团 + 呼吸律动效果 + 丝滑过渡 }}
       // 呼吸效果：使用正弦波创造律动感
       const breathingPhase = Math.sin(Date.now() * 0.001 * config.breathingSpeed * Math.PI * 2)
       const breathingScale = 1 + breathingPhase * config.breathingIntensity  // 0.85 → 1.15
@@ -171,8 +177,9 @@ function ParticleScene({ interactionStrength, handRotation, handDistance, isFaci
       // 动态抖动：根据强度添加粒子抖动效果
       const jitter = currentStrength * 0.2  // 提高抖动效果
       
-      // 动态速度：强度越高，粒子响应越快
-      const lerpSpeed = 0.05 + currentStrength * 0.15  // 提高响应速度
+      // {{ AURA-X: Modify - 提高响应速度，让收缩更丝滑 }}
+      // 动态速度：使用平滑曲线，让过渡更自然
+      const lerpSpeed = 0.08 + currentStrength * 0.12  // 提高基础速度和变化范围
 
       for (let i = 0; i < config.particleCount; i++) {
         const idx = i * 3

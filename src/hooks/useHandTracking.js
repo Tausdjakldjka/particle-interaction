@@ -317,8 +317,10 @@ export function useHandTracking() {
             
             setIsHeartGesture(isHeart)
             
-            if (isHeart) {
-              console.log('💕 检测到比心手势！')
+            // 调试：显示比心手势检测详情
+            const now = Date.now()
+            if (isHeart && now - lastDebugTime > 2000) {
+              console.log('💕 检测到比心手势！距离:', tipDistance.toFixed(3), '角度:', angle.toFixed(1), '度')
             }
 
             // {{ AURA-X: Add - 计算手掌旋转角度（基于手掌平面法向量）}}
