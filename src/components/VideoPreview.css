@@ -74,3 +74,91 @@
   box-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
 }
 
+/* {{ AURA-X: Add - 移动端适配 }} */
+@media (max-width: 768px) {
+  .video-preview-container {
+    bottom: 10px;
+    left: 10px;
+    max-width: calc(100vw - 20px);
+  }
+  
+  .video-preview {
+    width: 120px;
+    height: 90px;
+  }
+  
+  .gesture-indicator {
+    padding: 6px 10px;
+    margin-top: 6px;
+  }
+  
+  .gesture-icon {
+    font-size: 18px;
+  }
+  
+  .gesture-strength {
+    font-size: 10px;
+  }
+}
+
+/* 竖屏小屏幕 */
+@media (max-width: 480px) {
+  .video-preview-container {
+    bottom: 60px;  /* 避开底部手势区域 */
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  
+  .video-preview {
+    width: 100px;
+    height: 75px;
+  }
+  
+  .gesture-indicator {
+    padding: 5px 8px;
+    margin-top: 5px;
+    font-size: 9px;
+  }
+  
+  .gesture-icon {
+    font-size: 16px;
+    margin-bottom: 2px;
+  }
+  
+  .gesture-strength {
+    font-size: 9px;
+    margin-bottom: 2px;
+  }
+  
+  .gesture-bar {
+    height: 3px;
+  }
+}
+
+/* 横屏模式 */
+@media (max-height: 500px) and (orientation: landscape) {
+  .video-preview-container {
+    bottom: 10px;
+    right: 10px;
+    left: auto;
+  }
+  
+  .video-preview {
+    width: 80px;
+    height: 60px;
+  }
+  
+  .gesture-indicator {
+    padding: 4px 6px;
+    margin-top: 4px;
+  }
+  
+  .gesture-icon {
+    font-size: 14px;
+  }
+  
+  .gesture-strength {
+    font-size: 8px;
+  }
+}
+

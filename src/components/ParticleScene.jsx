@@ -22,9 +22,13 @@ function ParticleScene({ interactionStrength, handRotation, handDistance, isFaci
   const interactionStrengthRef = useRef(0)
   const handRotationRef = useRef({ x: 0, y: 0, z: 0 })
   const handDistanceRef = useRef(0.5)
+  // {{ AURA-X: Add - 移动端自动降低粒子数量 }}
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+  const isLowEnd = isMobile && (window.devicePixelRatio < 2 || navigator.hardwareConcurrency < 4)
+  
   const configRef = useRef({
-    particleCount: 30000,  // 提升到30000（原15000，增加100%）
-    particleSize: 0.04,    // 稍微减小粒子大小以保持视觉平衡
+    particleCount: isLowEnd ? 10000 : (isMobile ? 15000 : 30000),  // 移动端自适应
+    particleSize: isMobile ? 0.05 : 0.04,    // 移动端粒子稍大
     color: '#ff0066',      // 改为红色（浪漫的玫瑰红）
     shape: 'Heart',
     autoRotate: false,  // 改为false，使用手势控制
