@@ -1,0 +1,178 @@
+/* {{ AURA-X: Create - 移动端提示样式 }} */
+.mobile-tip {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.92);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 16px;
+  padding: 20px;
+  z-index: 1000;
+  max-width: 90vw;
+  width: 320px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -40%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+.mobile-tip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mobile-tip-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #00ffff;
+}
+
+.mobile-tip-close {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.mobile-tip-close:active {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  transform: scale(0.9);
+}
+
+.mobile-tip-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mobile-tip-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.4;
+}
+
+.mobile-tip-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  width: 28px;
+  text-align: center;
+}
+
+/* 悬浮帮助按钮 */
+.mobile-tip-fab {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(0, 255, 255, 0.2);
+  border: 2px solid rgba(0, 255, 255, 0.5);
+  color: #00ffff;
+  font-size: 20px;
+  cursor: pointer;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 255, 255, 0.3);
+  transition: all 0.2s;
+  animation: pulse 2s infinite;
+}
+
+.mobile-tip-fab:active {
+  background: rgba(0, 255, 255, 0.3);
+  transform: scale(0.95);
+}
+
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 4px 12px rgba(0, 255, 255, 0.3);
+  }
+  50% {
+    box-shadow: 0 4px 20px rgba(0, 255, 255, 0.6);
+  }
+}
+
+/* 小屏幕优化 */
+@media (max-width: 480px) {
+  .mobile-tip {
+    width: calc(100vw - 40px);
+    padding: 16px;
+  }
+  
+  .mobile-tip-title {
+    font-size: 15px;
+  }
+  
+  .mobile-tip-item {
+    font-size: 13px;
+    gap: 10px;
+  }
+  
+  .mobile-tip-icon {
+    font-size: 18px;
+    width: 24px;
+  }
+  
+  .mobile-tip-fab {
+    top: 16px;
+    right: 16px;
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
+  }
+}
+
+/* 横屏模式 */
+@media (max-height: 500px) and (orientation: landscape) {
+  .mobile-tip {
+    max-height: 80vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .mobile-tip-content {
+    gap: 8px;
+  }
+  
+  .mobile-tip-item {
+    font-size: 12px;
+  }
+  
+  .mobile-tip-fab {
+    top: 10px;
+    right: 10px;
+    width: 40px;
+    height: 40px;
+  }
+}
+

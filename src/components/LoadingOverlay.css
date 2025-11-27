@@ -115,3 +115,152 @@
   display: inline-block;
 }
 
+/* {{ AURA-X: Add - 移动端完整适配 }} */
+@media (max-width: 768px) {
+  .panel {
+    padding: 20px;
+    max-width: calc(100vw - 40px);
+    margin: 0 20px;
+  }
+  
+  .manual-panel h2 {
+    font-size: 20px;
+  }
+  
+  .manual-panel p {
+    font-size: 14px;
+  }
+  
+  .instruction-box {
+    padding: 12px;
+  }
+  
+  .instruction-box ul {
+    font-size: 13px !important;
+    padding-left: 18px !important;
+  }
+  
+  .btn {
+    padding: 14px 28px;
+    font-size: 15px;
+    min-height: 44px;  /* iOS 推荐的最小触摸区域 */
+    width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+@media (max-width: 480px) {
+  .overlay {
+    padding: 10px;
+  }
+  
+  .panel {
+    padding: 16px;
+    max-width: calc(100vw - 20px);
+    margin: 0 10px;
+    border-radius: 12px;
+  }
+  
+  .loading-panel .spinner {
+    font-size: 40px;
+    margin-bottom: 16px;
+  }
+  
+  .status-text {
+    font-size: 14px;
+  }
+  
+  .manual-panel h2 {
+    font-size: 18px;
+    margin-bottom: 12px;
+  }
+  
+  .manual-panel p {
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+  
+  .instruction-box {
+    padding: 10px;
+    margin-bottom: 16px;
+  }
+  
+  .instruction-label {
+    font-size: 13px;
+    margin-bottom: 8px;
+  }
+  
+  .instruction-box ul {
+    font-size: 12px !important;
+    line-height: 1.6 !important;
+    padding-left: 16px !important;
+  }
+  
+  .instruction-box ul li {
+    margin-bottom: 6px;
+  }
+  
+  .btn {
+    padding: 16px 20px;
+    font-size: 14px;
+    min-height: 48px;  /* 更大的触摸区域 */
+    width: 100%;
+    margin: 8px 0;
+  }
+}
+
+/* 横屏模式 */
+@media (max-height: 600px) and (orientation: landscape) {
+  .overlay {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .panel {
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    margin: 20px;
+  }
+  
+  .manual-panel h2 {
+    font-size: 16px;
+    margin-bottom: 8px;
+  }
+  
+  .manual-panel p {
+    font-size: 12px;
+    margin-bottom: 12px;
+  }
+  
+  .instruction-box {
+    padding: 8px;
+    margin-bottom: 12px;
+  }
+  
+  .btn {
+    padding: 10px 20px;
+    min-height: 40px;
+  }
+}
+
+/* 触摸设备优化 */
+@media (hover: none) and (pointer: coarse) {
+  .btn {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  .btn:active {
+    transform: scale(0.98);
+  }
+  
+  /* 确保链接也有足够的触摸区域 */
+  .manual-panel a {
+    padding: 4px 8px;
+    margin: 0 2px;
+    display: inline-block;
+    min-height: 32px;
+    line-height: 24px;
+  }
+}
+

@@ -20,6 +20,8 @@ export function useHandTracking() {
   const [isFacingCamera, setIsFacingCamera] = useState(false)
   // {{ AURA-X: Add - 比心手势检测 }}
   const [isHeartGesture, setIsHeartGesture] = useState(false)
+  // {{ AURA-X: Add - 手部关键点数据用于可视化 }}
+  const [handLandmarks, setHandLandmarks] = useState(null)
   const videoRef = useRef(null)
   const handLandmarkerRef = useRef(null)
   const visionContextRef = useRef(null)
@@ -33,6 +35,10 @@ export function useHandTracking() {
    */
   const initHandTracking = async (modelUrl = null) => {
     try {
+      // {{ AURA-X: Add - 设备检测（在函数顶部统一声明） }}
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      const isLowEnd = isMobile && (navigator.hardwareConcurrency < 4)
+      
       // 1. 初始化WASM运行环境
       if (!visionContextRef.current) {
         console.log('正在加载 WASM 运行环境...')
@@ -50,21 +56,50 @@ export function useHandTracking() {
         console.log('尝试加载本地模型:', finalModelPath)
       }
 
+      // {{ AURA-X: Modify - 移动端优化：GPU/CPU自适应，单手检测 }}
       // 3. 创建HandLandmarker实例（多重降级）
+      
       try {
         console.log('正在创建 HandLandmarker 实例...')
-        handLandmarkerRef.current = await HandLandmarker.createFromOptions(
-          visionContextRef.current,
-          {
-            baseOptions: {
-              modelAssetPath: finalModelPath,
-              delegate: "GPU"
-            },
-            runningMode: "VIDEO",
-            numHands: 2
+        
+        // 移动端优先尝试GPU，失败则降级到CPU
+        let delegate = isMobile ? "GPU" : "GPU"
+        let numHands = isLowEnd ? 1 : 2  // 低端设备只检测单手以提升性能
+        
+        try {
+          handLandmarkerRef.current = await HandLandmarker.createFromOptions(
+            visionContextRef.current,
+            {
+              baseOptions: {
+                modelAssetPath: finalModelPath,
+                delegate: delegate
+              },
+              runningMode: "VIDEO",
+              numHands: numHands
+            }
+          )
+          console.log(`✓ HandLandmarker 创建成功 [${delegate}] [${numHands}手]`)
+        } catch (gpuError) {
+          if (isMobile) {
+            // 移动端GPU失败，尝试CPU
+            console.warn('移动端GPU加速失败，降级到CPU模式...', gpuError)
+            delegate = "CPU"
+            handLandmarkerRef.current = await HandLandmarker.createFromOptions(
+              visionContextRef.current,
+              {
+                baseOptions: {
+                  modelAssetPath: finalModelPath,
+                  delegate: delegate
+                },
+                runningMode: "VIDEO",
+                numHands: numHands
+              }
+            )
+            console.log(`✓ HandLandmarker 创建成功 [${delegate}模式] [${numHands}手]`)
+          } else {
+            throw gpuError
           }
-        )
-        console.log('✓ HandLandmarker 创建成功')
+        }
       } catch (error) {
         console.warn('本地模型加载失败，尝试备用 CDN...', error)
         
@@ -72,31 +107,46 @@ export function useHandTracking() {
         finalModelPath = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
         console.log('尝试使用 Google CDN:', finalModelPath)
         
+        const delegate = isMobile ? "CPU" : "GPU"  // CDN降级时移动端直接用CPU
+        const numHands = isLowEnd ? 1 : 2
+        
         handLandmarkerRef.current = await HandLandmarker.createFromOptions(
           visionContextRef.current,
           {
             baseOptions: {
               modelAssetPath: finalModelPath,
-              delegate: "GPU"
+              delegate: delegate
             },
             runningMode: "VIDEO",
-            numHands: 2
+            numHands: numHands
           }
         )
-        console.log('✓ 备用 CDN 加载成功')
+        console.log(`✓ 备用 CDN 加载成功 [${delegate}] [${numHands}手]`)
       }
 
-      // 4. 启动摄像头（增强错误处理）
+      // {{ AURA-X: Modify - 移动端摄像头优化 }}
+      // 4. 启动摄像头（增强错误处理，移动端自适应）
       console.log('正在请求摄像头权限...')
+      
+      // 移动端使用较低分辨率和帧率以提升性能
+      const videoConstraints = isMobile ? {
+        facingMode: 'user',  // 前置摄像头
+        width: { ideal: isLowEnd ? 640 : 960 },   // 低端640p，普通960p
+        height: { ideal: isLowEnd ? 480 : 720 },  // 保持16:9比例
+        frameRate: { ideal: isLowEnd ? 20 : 30 }  // 降低帧率减少处理压力
+      } : {
+        facingMode: 'user',
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        frameRate: { ideal: 30 }
+      }
+      
+      console.log('📱 设备类型:', isMobile ? '移动端' : '桌面端', '| 分辨率:', videoConstraints.width.ideal, 'x', videoConstraints.height.ideal)
       
       let stream
       try {
         stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { 
-            facingMode: 'user',
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          } 
+          video: videoConstraints
         })
         console.log('✓ 摄像头权限获取成功')
       } catch (cameraError) {
@@ -179,11 +229,23 @@ export function useHandTracking() {
 
   /**
    * 手势检测循环
-   * {{ AURA-X: Modify - 增强调试信息，帮助追踪手势检测状态 }}
+   * {{ AURA-X: Modify - 移动端性能优化：跳帧处理 }}
    */
   const startDetectionLoop = () => {
     let frameCount = 0
     let lastDebugTime = Date.now()
+    
+    // {{ AURA-X: Add - 移动端跳帧优化 + FPS监控 }}
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    const isLowEnd = isMobile && (navigator.hardwareConcurrency < 4)
+    // 移动端跳帧：低端设备每3帧检测一次，普通移动端每2帧检测一次，桌面端每帧检测
+    const skipFrames = isLowEnd ? 3 : (isMobile ? 2 : 1)
+    let currentFrame = 0
+    
+    // FPS监控
+    let fpsFrameCount = 0
+    let lastFpsTime = Date.now()
+    let currentFps = 0
     
     const detect = () => {
       const video = videoRef.current
@@ -193,11 +255,31 @@ export function useHandTracking() {
         // 避免重复处理同一帧
         if (video.currentTime !== lastVideoTimeRef.current) {
           lastVideoTimeRef.current = video.currentTime
+          currentFrame++
+
+          // {{ AURA-X: Modify - 移动端跳帧处理，减少检测频率 }}
+          // 只在指定帧数时才执行检测
+          if (currentFrame % skipFrames !== 0) {
+            animationFrameRef.current = requestAnimationFrame(detect)
+            return
+          }
+
+          // {{ AURA-X: Add - FPS监控 }}
+          fpsFrameCount++
+          const now = Date.now()
+          if (now - lastFpsTime >= 1000) {
+            currentFps = Math.round(fpsFrameCount * 1000 / (now - lastFpsTime))
+            fpsFrameCount = 0
+            lastFpsTime = now
+          }
 
           // 执行手势检测
           const result = landmarker.detectForVideo(video, performance.now())
 
           if (result.landmarks.length > 0) {
+            // {{ AURA-X: Add - 更新手部关键点数据用于可视化 }}
+            setHandLandmarks(result.landmarks)
+            
             // {{ AURA-X: Modify - 使用手指开合度计算，更灵敏自然 }}
             const hand = result.landmarks[0]
             
@@ -383,41 +465,50 @@ export function useHandTracking() {
             // 修正映射关系：palmWidth 0.08-0.25 → distance 1.0-0.0
             const distance = Math.max(0, Math.min(1, (0.25 - palmWidth) / (0.25 - 0.08)))
 
-            // {{ AURA-X: Modify - 提高响应灵敏度，让交互更跟手 }}
-            // 平滑过渡（响应手势开合），提高响应速度
+            // {{ AURA-X: Modify - 移动端自适应平滑系数 }}
+            // 平滑过渡（响应手势开合），移动端使用更大的平滑系数补偿跳帧
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+            const smoothFactor = isMobile ? 0.35 : 0.25  // 移动端更大的平滑系数
+            
             setInteractionStrength(prev => {
-              const newValue = prev + (strength - prev) * 0.25  // 提高到0.25，更灵敏
+              const newValue = prev + (strength - prev) * smoothFactor
               return newValue
             })
             
-            // {{ AURA-X: Modify - 提高旋转响应速度，让交互更流畅 }}
-            // 平滑过渡旋转角度（正面时快速复位，其他时候也提高响应速度）
-            const resetSpeed = isFacingCamera ? 0.35 : 0.25
+            // {{ AURA-X: Modify - 移动端自适应旋转和距离平滑系数 }}
+            // 平滑过渡旋转角度（移动端使用更大的平滑系数）
+            const rotationSmoothFactor = isMobile ? 0.4 : 0.25
+            const resetSpeed = isFacingCamera ? (isMobile ? 0.5 : 0.35) : rotationSmoothFactor
             setHandRotation(prev => ({
               x: prev.x + (finalRotationX - prev.x) * resetSpeed,
               y: prev.y + (finalRotationY - prev.y) * resetSpeed,
               z: prev.z + (finalRotationZ - prev.z) * resetSpeed
             }))
             
-            // {{ AURA-X: Modify - 移除距离强制复位，让距离始终跟手 }}
-            // 平滑过渡距离（始终响应手掌大小变化，提高响应速度）
+            // 平滑过渡距离（移动端使用更大的平滑系数）
+            const distanceSmoothFactor = isMobile ? 0.35 : 0.25
             setHandDistance(prev => {
-              return prev + (distance - prev) * 0.25  // 提高到0.25，更灵敏
+              return prev + (distance - prev) * distanceSmoothFactor
             })
             
             // 更新正面状态
             setIsFacingCamera(isFacingCamera)
             
-            // {{ AURA-X: Fix - 避免重复声明 now 变量 }}
-            // 每3秒输出一次调试信息
+            // {{ AURA-X: Modify - 添加FPS和性能监控 }}
+            // 每3秒输出一次调试信息（包含FPS和性能状态）
             const currentTime = Date.now()
             if (currentTime - lastDebugTime > 3000) {
               const facing = isFacingCamera ? '✋正面' : '🔄侧面'
-              console.log(`🖐️ 手势 | 强度: ${strength.toFixed(2)} | ${facing} | normal.z: ${normal.z.toFixed(2)} | 距离: ${distance.toFixed(2)}`)
+              const deviceType = isLowEnd ? '📱低端' : (isMobile ? '📱移动' : '💻桌面')
+              const fpsStatus = currentFps >= 20 ? '✅' : (currentFps >= 15 ? '⚠️' : '❌')
+              console.log(`${fpsStatus} ${currentFps}FPS | ${deviceType} | 强度: ${strength.toFixed(2)} | ${facing} | normal.z: ${normal.z.toFixed(2)} | 距离: ${distance.toFixed(2)}`)
               lastDebugTime = currentTime
             }
           } else {
             // {{ AURA-X: Modify - 没有检测到手势时，保持当前状态不动 }}
+            // 清除手部关键点数据
+            setHandLandmarks(null)
+            
             // 强度逐渐归零
             setInteractionStrength(prev => prev + (0 - prev) * 0.05)
             
@@ -445,7 +536,11 @@ export function useHandTracking() {
       animationFrameRef.current = requestAnimationFrame(detect)
     }
 
-    console.log('🎬 手势检测循环已启动')
+    // {{ AURA-X: Add - 输出性能优化配置 }}
+    const deviceType = isLowEnd ? '低端移动设备' : (isMobile ? '移动设备' : '桌面设备')
+    const skipInfo = skipFrames > 1 ? `（跳帧：每${skipFrames}帧检测1次）` : '（全帧检测）'
+    console.log(`🎬 手势检测循环已启动 | ${deviceType} ${skipInfo}`)
+    
     detect()
   }
 
@@ -469,6 +564,7 @@ export function useHandTracking() {
     handDistance,
     isFacingCamera,
     isHeartGesture,  // {{ AURA-X: Add - 导出比心手势状态 }}
+    handLandmarks,   // {{ AURA-X: Add - 导出手部关键点数据用于可视化 }}
     initHandTracking
   }
 }

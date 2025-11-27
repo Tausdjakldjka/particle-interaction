@@ -22,13 +22,22 @@ function ParticleScene({ interactionStrength, handRotation, handDistance, isFaci
   const interactionStrengthRef = useRef(0)
   const handRotationRef = useRef({ x: 0, y: 0, z: 0 })
   const handDistanceRef = useRef(0.5)
-  // {{ AURA-X: Add - 移动端自动降低粒子数量 }}
+  // {{ AURA-X: Modify - 增强移动端性能优化和自适应 }}
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+  const isTablet = /iPad|Android/i.test(navigator.userAgent) && window.innerWidth >= 768
   const isLowEnd = isMobile && (window.devicePixelRatio < 2 || navigator.hardwareConcurrency < 4)
   
+  // 根据设备类型和性能动态调整粒子数量
+  const getParticleCount = () => {
+    if (isLowEnd) return 8000        // 低端设备：8k粒子
+    if (isMobile && !isTablet) return 12000  // 手机：12k粒子
+    if (isTablet) return 18000       // 平板：18k粒子
+    return 30000                     // 桌面：30k粒子
+  }
+  
   const configRef = useRef({
-    particleCount: isLowEnd ? 10000 : (isMobile ? 15000 : 30000),  // 移动端自适应
-    particleSize: isMobile ? 0.05 : 0.04,    // 移动端粒子稍大
+    particleCount: getParticleCount(),
+    particleSize: isMobile ? 0.06 : 0.04,    // 移动端粒子更大，更易见
     color: '#ff0066',      // 改为红色（浪漫的玫瑰红）
     shape: 'Heart',
     autoRotate: false,  // 改为false，使用手势控制
@@ -64,10 +73,17 @@ function ParticleScene({ interactionStrength, handRotation, handDistance, isFaci
     camera.position.y = 1  // 原来2，现在1，视角更平
     cameraRef.current = camera
 
-    // 创建渲染器
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
+    // {{ AURA-X: Modify - 移动端渲染器优化 }}
+    // 创建渲染器（移动端关闭抗锯齿以提升性能）
+    const renderer = new THREE.WebGLRenderer({ 
+      antialias: !isMobile,  // 移动端关闭抗锯齿
+      alpha: true,
+      powerPreference: isMobile ? 'low-power' : 'high-performance'  // 移动端省电模式
+    })
     renderer.setSize(container.clientWidth, container.clientHeight)
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    // 限制像素比：低端1x，移动端1.5x，桌面2x
+    const pixelRatio = isLowEnd ? 1 : (isMobile ? Math.min(window.devicePixelRatio, 1.5) : Math.min(window.devicePixelRatio, 2))
+    renderer.setPixelRatio(pixelRatio)
     container.appendChild(renderer.domElement)
     rendererRef.current = renderer
 
@@ -100,9 +116,16 @@ function ParticleScene({ interactionStrength, handRotation, handDistance, isFaci
     scene.add(particles)
     particlesRef.current = particles
 
-    // {{ AURA-X: Modify - 增强GUI控制面板，添加使用提示 }}
-    // 创建GUI控制面板
-    const gui = new GUI({ title: '🎮 交互控制' })
+    // {{ AURA-X: Modify - 移动端优化：默认关闭GUI }}
+    // 创建GUI控制面板（移动端默认关闭）
+    const gui = new GUI({ 
+      title: '🎮 交互控制',
+      closeFolders: isMobile,  // 移动端默认折叠所有文件夹
+      width: isMobile ? 280 : 320  // 移动端缩小宽度
+    })
+    if (isMobile) {
+      gui.close()  // 移动端默认关闭GUI
+    }
     guiRef.current = gui
     
     gui.add(config, 'shape', Object.keys(shapesRef.current)).name('🎨 切换模型')
@@ -233,17 +256,40 @@ function ParticleScene({ interactionStrength, handRotation, handDistance, isFaci
     }
     animate()
 
-    // 窗口大小调整处理
+    // {{ AURA-X: Modify - 优化窗口大小调整，添加防抖和移动端横竖屏处理 }}
+    // 窗口大小调整处理（防抖优化）
+    let resizeTimeout
     const handleResize = () => {
-      camera.aspect = container.clientWidth / container.clientHeight
-      camera.updateProjectionMatrix()
-      renderer.setSize(container.clientWidth, container.clientHeight)
+      // 移动端横竖屏切换可能需要延迟处理
+      clearTimeout(resizeTimeout)
+      resizeTimeout = setTimeout(() => {
+        if (!container.clientWidth || !container.clientHeight) return
+        
+        camera.aspect = container.clientWidth / container.clientHeight
+        camera.updateProjectionMatrix()
+        renderer.setSize(container.clientWidth, container.clientHeight)
+        
+        // 移动端横竖屏切换时，重新调整像素比
+        if (isMobile) {
+          const newPixelRatio = isLowEnd ? 1 : Math.min(window.devicePixelRatio, 1.5)
+          renderer.setPixelRatio(newPixelRatio)
+        }
+      }, isMobile ? 100 : 50)  // 移动端稍长的防抖时间
     }
     window.addEventListener('resize', handleResize)
+    
+    // 移动端orientation change事件
+    if (isMobile) {
+      window.addEventListener('orientationchange', handleResize)
+    }
 
     // 清理函数
     return () => {
       window.removeEventListener('resize', handleResize)
+      if (isMobile) {
+        window.removeEventListener('orientationchange', handleResize)
+      }
+      clearTimeout(resizeTimeout)
       cancelAnimationFrame(animationId)
       
       if (gui) gui.destroy()

@@ -1,4 +1,4 @@
-/* {{ AURA-X: Modify - 添加手势检测视觉反馈样式 }} */
+/* {{ AURA-X: Modify - 添加手势检测视觉反馈和Canvas叠加层样式 }} */
 .video-preview-container {
   position: absolute;
   bottom: 20px;
@@ -6,15 +6,39 @@
   z-index: 2;
 }
 
-.video-preview {
+/* {{ AURA-X: Add - 视频和Canvas的容器 }} */
+.video-canvas-wrapper {
+  position: relative;
   width: 160px;
   height: 120px;
   border-radius: 8px;
+  overflow: hidden;
   border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.video-preview {
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
   transform: scaleX(-1);
   opacity: 0.7;
   background: #222;
   display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* {{ AURA-X: Add - Canvas叠加层，用于绘制手部骨架 }} */
+.hand-overlay-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  transform: scaleX(-1);
+  pointer-events: none;
+  z-index: 1;
 }
 
 /* 手势检测指示器 */
@@ -100,7 +124,7 @@
     max-width: calc(100vw - 20px);
   }
   
-  .video-preview {
+  .video-canvas-wrapper {
     width: 120px;
     height: 90px;
   }
@@ -127,7 +151,7 @@
     transform: translateX(-50%);
   }
   
-  .video-preview {
+  .video-canvas-wrapper {
     width: 100px;
     height: 75px;
   }
@@ -161,7 +185,7 @@
     left: auto;
   }
   
-  .video-preview {
+  .video-canvas-wrapper {
     width: 80px;
     height: 60px;
   }

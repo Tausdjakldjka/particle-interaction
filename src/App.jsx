@@ -3,6 +3,7 @@ import ParticleScene from "./components/ParticleScene";
 import VideoPreview from "./components/VideoPreview";
 import LoadingOverlay from "./components/LoadingOverlay";
 import FullscreenButton from "./components/FullscreenButton";
+import MobileTip from "./components/MobileTip";
 import { useHandTracking } from "./hooks/useHandTracking";
 import "./App.css";
 
@@ -13,8 +14,8 @@ function App() {
   const [errorMessage, setErrorMessage] = useState("");
   const initStartedRef = useRef(false);
 
-  // {{ AURA-X: Modify - 获取增强的手势数据：开合度、旋转、距离、正面状态、比心手势 }}
-  const { videoRef, interactionStrength, handRotation, handDistance, isFacingCamera, isHeartGesture, initHandTracking } = useHandTracking();
+  // {{ AURA-X: Modify - 获取增强的手势数据：开合度、旋转、距离、正面状态、比心手势、关键点 }}
+  const { videoRef, interactionStrength, handRotation, handDistance, isFacingCamera, isHeartGesture, handLandmarks, initHandTracking } = useHandTracking();
 
   // 自动初始化逻辑
   // {{ AURA-X: Modify - 使用 ref 防止重复初始化 }}
@@ -93,12 +94,13 @@ function App() {
         />
       )}
 
-      {/* {{ AURA-X: Modify - 传递完整的手势数据 }} */}
+      {/* {{ AURA-X: Modify - 传递完整的手势数据和关键点 }} */}
       <VideoPreview 
         videoRef={videoRef} 
         interactionStrength={interactionStrength}
         isFacingCamera={isFacingCamera}
         isHeartGesture={isHeartGesture}
+        handLandmarks={handLandmarks}
       />
       <ParticleScene 
         interactionStrength={interactionStrength}
@@ -108,6 +110,8 @@ function App() {
         isHeartGesture={isHeartGesture}
       />
       <FullscreenButton />
+      {/* {{ AURA-X: Add - 移动端操作提示 }} */}
+      <MobileTip />
     </div>
   );
 }

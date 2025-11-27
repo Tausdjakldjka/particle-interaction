@@ -67,7 +67,8 @@ canvas {
   touch-action: none;
 }
 
-/* 移动端横竖屏提示 */
+/* {{ AURA-X: Modify - 增强移动端体验 }} */
+/* 移动端横竖屏适配 */
 @media (max-width: 768px) and (orientation: portrait) {
   body::before {
     content: "";
@@ -80,5 +81,69 @@ canvas {
     background: rgba(0, 0, 0, 0.5);
     z-index: 10000;
     pointer-events: none;
+  }
+}
+
+/* 移动端文字大小优化 */
+@media (max-width: 768px) {
+  html {
+    font-size: 16px;  /* 防止iOS自动缩放 */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  
+  body {
+    font-size: 14px;
+  }
+}
+
+/* 小屏幕优化 */
+@media (max-width: 480px) {
+  html {
+    font-size: 14px;
+  }
+  
+  body {
+    font-size: 13px;
+  }
+}
+
+/* 横屏模式优化 */
+@media (max-height: 500px) and (orientation: landscape) {
+  html {
+    font-size: 12px;
+  }
+  
+  body {
+    font-size: 11px;
+  }
+}
+
+/* 触摸设备性能优化 */
+@media (hover: none) and (pointer: coarse) {
+  * {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+  }
+  
+  /* 优化滚动性能 */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* 防止点击延迟 */
+  a, button, input, select, textarea {
+    touch-action: manipulation;
+  }
+}
+
+/* 减少移动端动画性能消耗 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
