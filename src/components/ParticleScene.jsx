@@ -180,9 +180,10 @@ function ParticleScene({ interactionStrength, handRotation, handDistance, isFaci
       const currentShape = isHeartGesture ? 'LoveText' : config.shape
       const target = shapesRef.current[currentShape]
       
-      // 调试：每5秒输出一次当前形状
-      if (Math.random() < 0.005) {
-        console.log('🎨 当前形状:', currentShape, 'isHeartGesture:', isHeartGesture)
+      // {{ AURA-X: Modify - 增强调试信息，比心时立即输出 }}
+      // 比心手势状态变化时立即输出
+      if (isHeartGesture && Math.random() < 0.02) {
+        console.log('🎨💕 ParticleScene收到比心！当前形状:', currentShape, '| isHeartGesture:', isHeartGesture, '| lerpSpeed:', lerpSpeed.toFixed(2))
       }
       const currentStrength = interactionStrengthRef.current
       const currentRotation = handRotationRef.current

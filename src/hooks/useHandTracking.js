@@ -234,6 +234,7 @@ export function useHandTracking() {
   const startDetectionLoop = () => {
     let frameCount = 0
     let lastDebugTime = Date.now()
+    let lastHeartDebugTime = Date.now()  // {{ AURA-X: Add - 比心手势专用调试时间戳 }}
     
     // {{ AURA-X: Add - 移动端跳帧优化 + FPS监控 }}
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
@@ -390,19 +391,27 @@ export function useHandTracking() {
               Math.pow(pinkyTip.y - wrist.y, 2)
             ) < 0.15
             
-            // 比心手势判断条件：
-            // - 拇指和食指尖距离近（< 0.05）
-            // - 两指夹角在30-90度之间
-            // - 其他三指至少有两个弯曲
+            // {{ AURA-X: Modify - 放宽比心手势检测条件，更容易触发 }}
+            // 比心手势判断条件（已优化，更容易识别）：
+            // - 拇指和食指尖距离近（< 0.08，原来0.05太严格）
+            // - 两指夹角在20-120度之间（扩大范围）
+            // - 其他三指至少有一个弯曲（降低要求）
             const otherFingersBent = (middleBent ? 1 : 0) + (ringBent ? 1 : 0) + (pinkyBent ? 1 : 0)
-            const isHeart = tipDistance < 0.05 && angle > 30 && angle < 90 && otherFingersBent >= 2
+            const isHeart = tipDistance < 0.08 && angle > 20 && angle < 120 && otherFingersBent >= 1
             
             setIsHeartGesture(isHeart)
             
-            // 调试：显示比心手势检测详情
-            const now = Date.now()
-            if (isHeart && now - lastDebugTime > 2000) {
-              console.log('💕 检测到比心手势！距离:', tipDistance.toFixed(3), '角度:', angle.toFixed(1), '度')
+            // {{ AURA-X: Modify - 增强调试信息，实时显示检测状态 }}
+            // 每秒输出一次调试信息（无论是否检测到），方便用户实时查看
+            const heartCheckTime = Date.now()
+            if (heartCheckTime - lastHeartDebugTime > 1000) {
+              if (isHeart) {
+                console.log('💕💕💕 检测到比心手势！ | 距离:', tipDistance.toFixed(3), '| 角度:', angle.toFixed(1), '° | 弯曲手指:', otherFingersBent)
+              } else {
+                // 显示当前数值，帮助用户调整手势
+                console.log('👆 比心检测 | 距离:', tipDistance.toFixed(3), '(需<0.08) | 角度:', angle.toFixed(1), '°(需20-120) | 弯曲:', otherFingersBent, '(需≥1)')
+              }
+              lastHeartDebugTime = heartCheckTime
             }
 
             // {{ AURA-X: Add - 计算手掌旋转角度（基于手掌平面法向量）}}
