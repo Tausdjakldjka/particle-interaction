@@ -408,12 +408,13 @@ export function useHandTracking() {
             // 更新正面状态
             setIsFacingCamera(isFacingCamera)
             
+            // {{ AURA-X: Fix - 避免重复声明 now 变量 }}
             // 每3秒输出一次调试信息
-            const now = Date.now()
-            if (now - lastDebugTime > 3000) {
+            const currentTime = Date.now()
+            if (currentTime - lastDebugTime > 3000) {
               const facing = isFacingCamera ? '✋正面' : '🔄侧面'
               console.log(`🖐️ 手势 | 强度: ${strength.toFixed(2)} | ${facing} | normal.z: ${normal.z.toFixed(2)} | 距离: ${distance.toFixed(2)}`)
-              lastDebugTime = now
+              lastDebugTime = currentTime
             }
           } else {
             // {{ AURA-X: Modify - 没有检测到手势时，保持当前状态不动 }}
