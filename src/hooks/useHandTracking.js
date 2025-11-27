@@ -305,7 +305,8 @@ export function useHandTracking() {
             
             // 检测手掌背面是否朝向摄像头（法向量Z分量接近+1，即手掌心朝向自己）
             // 这样的姿态是"标准正面"，用于复位模型
-            const isFacingCamera = normal.z > 0.65  // 手掌背面朝摄像头（降低阈值更容易触发）
+            // 提高阈值，只有非常明确的正面才触发复位
+            const isFacingCamera = normal.z > 0.85  // 手掌背面朝摄像头（提高阈值，避免误触发）
             
             // 如果手掌正面，将旋转角度归零（复位）
             const finalRotationX = isFacingCamera ? 0 : rotationX
@@ -353,7 +354,7 @@ export function useHandTracking() {
             const now = Date.now()
             if (now - lastDebugTime > 3000) {
               const facing = isFacingCamera ? '✋正面' : '🔄侧面'
-              console.log(`🖐️ 手势 | 强度: ${strength.toFixed(2)} | ${facing} | 旋转: (${finalRotationX.toFixed(0)}°, ${finalRotationY.toFixed(0)}°, ${finalRotationZ.toFixed(0)}°) | 距离: ${distance.toFixed(2)}`)
+              console.log(`🖐️ 手势 | 强度: ${strength.toFixed(2)} | ${facing} | normal.z: ${normal.z.toFixed(2)} | 距离: ${distance.toFixed(2)}`)
               lastDebugTime = now
             }
           } else {
